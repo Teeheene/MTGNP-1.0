@@ -1683,6 +1683,12 @@ class Game:
         if len(self.clients) != self.max_clients:
             raise RuntimeError("The game cannot start until the lobby is full.")
 
+        for c in self.clients:
+            try:
+                c.sock.settimeout(None)
+            except Exception:
+                pass
+
         if not self.game_setup():
             return
 

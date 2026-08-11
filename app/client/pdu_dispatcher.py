@@ -68,6 +68,7 @@ class PduDispatcher:
             "library_counts",
             "battlefield",
             "graveyard",
+            "exile",
             "stack",
             "suspended_cards",
             "land_played_this_turn",

@@ -60,15 +60,23 @@ class PduDispatcher:
     def handle(self, client, pdu):
         pdu_type = pdu.get("type")
 
-        trigger_pending = (
-            getattr(client, "pending_trigger_ids", None) is not None
-            or getattr(client, "pending_trigger_choice", None) is not None
-        )
-        if (self.server.has_pending_card_choice() or trigger_pending) and pdu_type not in {
-            "CARD_CHOICE_RESPONSE", "TRIGGER_ORDER_RESPONSE", "TRIGGER_CHOICE_RESPONSE", "PING", "CONCEDE",
+        if self.server.has_pending_card_choice() and pdu_type not in {
+            "CARD_CHOICE_RESPONSE", "PING", "CONCEDE",
         }:
             return self.send_error(
                 client, "A mandatory card choice is pending.", ERR_ILLEGAL_ACTION, pdu
+            )
+
+        any_trigger_pending = any(
+            getattr(c, "pending_trigger_ids", None) is not None
+            or getattr(c, "pending_trigger_choice", None) is not None
+            for c in self.server.clients
+        )
+        if any_trigger_pending and pdu_type not in {
+            "TRIGGER_ORDER_RESPONSE", "TRIGGER_CHOICE_RESPONSE", "PING", "CONCEDE",
+        }:
+            return self.send_error(
+                client, "A mandatory trigger choice is pending.", ERR_ILLEGAL_ACTION, pdu
             )
 
         handler = self.handlers.get(pdu_type)
@@ -180,13 +188,7 @@ class PduDispatcher:
         return True
 
     def reissue_priority_grant(self, client):
-        pdu = {
-            "type": "PRIORITY_GRANT",
-            "seq_num": getattr(client, "active_priority_seq_num", getattr(self.server, "seq_num", 0)),
-            "player_id": client.pid,
-            "time_limit_ms": 30000
-        }
-        client.send(pdu)
+        return self.send_priority_grant(client, client.pid)
 
     def _validate_phase_seq_num(self, client, pdu):
         expected_seq = getattr(client, "active_phase_seq_num", None)

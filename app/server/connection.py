@@ -44,7 +44,7 @@ class ServerConnection:
             while self.running:
                 # Accept new connections if below max_clients
                 if len(self.clients) < self.max_clients:
-                    self.sock.settimeout(0.2)
+                    self.sock.settimeout(0.05)
                     try:
                         client_sock, address = self.sock.accept()
                         print(f"Connection attempt from {address}")
@@ -54,34 +54,48 @@ class ServerConnection:
                         self.clients.append(client)
                     except (socket.timeout, TimeoutError, OSError):
                         pass
+                else:
+                    self.refuse_extra_connections()
 
-                # Check for PLAYER_READY from all connected clients
+                # Check for PDUs from all connected clients
                 for client in list(self.clients):
-                    if not getattr(client, "ready_in_lobby", False):
-                        client.sock.settimeout(0.05)
-                        try:
-                            pdu = client.receive()
-                            if isinstance(pdu, dict) and pdu.get("type") == "PLAYER_READY":
+                    client.sock.settimeout(0.05)
+                    try:
+                        pdu = client.receive()
+                        if isinstance(pdu, dict):
+                            pdu_type = pdu.get("type")
+                            if pdu_type == "PING":
+                                self.pdu_dispatcher.send_pong(client, pdu)
+                            elif pdu_type == "PLAYER_READY":
                                 if self.pdu_dispatcher.handle_player_ready(client, pdu):
                                     client.ready_in_lobby = True
                                     state = self.state_builder.build_lobby_state()
                                     for c in self.clients:
                                         self.pdu_dispatcher.send_game_state_update(c, state)
-                        except (socket.timeout, TimeoutError, OSError):
-                            pass
-                        except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
-                            from app.server.pdu_dispatcher import MSG_INVALID_JSON, ERR_INVALID_JSON
-                            self.pdu_dispatcher.send_error(client, MSG_INVALID_JSON, ERR_INVALID_JSON)
-                        except ConnectionError:
-                            print(f"Client {client.address} disconnected in lobby.")
-                            if client in self.clients:
-                                self.clients.remove(client)
-                            client.close()
+                    except (socket.timeout, TimeoutError, OSError):
+                        pass
+                    except (json.JSONDecodeError, UnicodeDecodeError, ValueError):
+                        from app.server.pdu_dispatcher import MSG_INVALID_JSON, ERR_INVALID_JSON
+                        self.pdu_dispatcher.send_error(client, MSG_INVALID_JSON, ERR_INVALID_JSON)
+                    except (ConnectionError, EOFError):
+                        print(f"Client {client.address} disconnected in lobby.")
+                        if client in self.clients:
+                            self.clients.remove(client)
+                        client.ready_in_lobby = False
+                        client.close()
+                        state = self.state_builder.build_lobby_state()
+                        for c in list(self.clients):
+                            try:
+                                self.pdu_dispatcher.send_game_state_update(c, state)
+                            except Exception:
+                                pass
 
                 # Check if all clients are connected AND ready
                 ready_count = sum(1 for c in self.clients if getattr(c, "ready_in_lobby", False))
                 if len(self.clients) == self.max_clients and ready_count == self.max_clients:
                     print("Both players connected and ready! Starting game loop...")
+                    for c in self.clients:
+                        c.sock.settimeout(None)
                     self.game.run_game_loop()
                     break
 
