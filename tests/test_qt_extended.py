@@ -65,5 +65,22 @@ class TestQtExtendedClient(unittest.TestCase):
         self.assertIn("PRECOMBAT_MAIN", self.window.status_label.text())
 
 
+    def test_connect_and_disconnect_ui_state_flow(self):
+        conn = MagicMock()
+        self.dispatcher.connection = conn
+
+        self.window.connect_to_server()
+        self.assertTrue(self.state.connected)
+        self.assertFalse(self.window.connect_btn.isEnabled())
+        self.assertEqual(self.window.connection_error.text(), "Connected to server.")
+        self.assertEqual(self.window.pages.currentIndex(), 1)  # Lobby page
+
+        self.window.close_connection()
+        self.assertFalse(self.state.connected)
+        self.assertTrue(self.window.connect_btn.isEnabled())
+        self.assertEqual(self.window.connection_error.text(), "")
+        self.assertEqual(self.window.pages.currentIndex(), 0)  # Connection page
+
+
 if __name__ == "__main__":
     unittest.main()

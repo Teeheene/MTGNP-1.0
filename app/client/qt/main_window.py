@@ -34,6 +34,7 @@ class MainWindow(QMainWindow):
         self._trigger_dialog_open = False
         self._selected_attackers = []
         self._mulligan_count = 0
+        self._ready_sent = False
         self.setWindowTitle(f"MTGNP 1.0 Client — Player: {state.pid}")
         self.resize(1366, 820)
         self._build_ui()
@@ -141,19 +142,35 @@ class MainWindow(QMainWindow):
     def connect_to_server(self):
         try:
             self.state.pid = self.name_edit.text().strip() or self.state.pid
+
             connection = self.dispatcher.connection
-            connection.host = self.host_edit.text().strip(); connection.port = int(self.port_edit.text())
-            connection.connect(); connection.start_heartbeat(self.dispatcher)
+            connection.host = self.host_edit.text().strip()
+            connection.port = int(self.port_edit.text())
+
+            connection.connect()
+            connection.start_heartbeat(self.dispatcher)
+
+            self.state.connected = True
+            self.connection_error.setText("Connected to server.")
+            self.connect_btn.setEnabled(False)
+
+            self.refresh_ui()
+
         except (OSError, ValueError) as error:
+            self.state.connected = False
             self.connection_error.setText(f"Connection failed: {error}")
 
     def send_ready(self):
+        if self._ready_sent:
+            return
         if not self.state.deck_list:
             deck_name = self.deck_combo.currentText().split()[0]
             counts = DEFAULT_DECKS.get(deck_name, {})
             deck = self.catalog.create_deck(counts)
             self.state.deck_list = [card.card_id for card in deck]
         self.dispatcher.send_player_ready()
+        self._ready_sent = True
+        self.lobby_status.setText("Ready. Waiting for opponent.")
 
     def send_rematch(self):
         self.state.reset_for_lobby()
@@ -161,7 +178,14 @@ class MainWindow(QMainWindow):
 
     def close_connection(self):
         self.dispatcher.connection.close()
-        self.state.reset_for_lobby(); self.refresh_ui()
+        self.state.connected = False
+        self.state.reset_for_lobby()
+
+        self.connect_btn.setEnabled(True)
+        self._ready_sent = False
+        self.connection_error.setText("")
+
+        self.refresh_ui()
 
     def refresh_ui(self):
         phase = self.state.phase or self.state.current_state.get("phase", "LOBBY")
@@ -196,8 +220,6 @@ class MainWindow(QMainWindow):
         self.hand_list.set_cards([self.presenter.card(card_id) for card_id in self.state.local_hand])
         self.your_battlefield_list.set_cards([self.presenter.card(card.get("id", str(card)), tapped=bool(card.get("tapped"))) for card in self.state.battlefield.get(self.state.pid, [])])
         self.opp_battlefield_list.set_cards([self.presenter.card(card.get("id", str(card)), selectable=False) for card in self.state.battlefield.get(opponent, [])])
-        pass
-        pass
         self.stack_list.set_cards([self.presenter.card(item.get("source", "Ability")) for item in self.state.stack])
         for item in self.state.stack: self.stack_list.addItem(f"{item.get('source', 'Ability')} — {item.get('controller', '')}")
         self.exile_list.set_cards([self.presenter.card(card_id) for card_id in self.state.exile.get(self.state.pid, [])])
@@ -301,7 +323,7 @@ class MainWindow(QMainWindow):
 
     def on_attack_clicked(self):
         if self.state.phase != "DECLARE_ATTACKERS": return
-        ids = [self.your_battlefield_list.item(i).text().split(" ")[0] for i in range(self.your_battlefield_list.count()) if self.your_battlefield_list.item(i).isSelected()]
+        ids = self.your_battlefield_list.selected_card_ids()
         opponent = self.presenter.opponent_id()
         self.dispatcher.send_declare_attackers([{"creature_id": card_id, "target": opponent} for card_id in ids])
 

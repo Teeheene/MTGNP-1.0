@@ -10,6 +10,8 @@ class CardWidget(QFrame):
     def __init__(self, card, parent=None, asset_manager=None, variant="art"):
         super().__init__(parent)
         self.card = card
+        self.selectable = bool(card.selectable)
+        self.setProperty("selected", False)
         self.asset_manager = asset_manager
         self._asset_base = CardCatalog.base_card_id(card.card_id)
         self.setObjectName("CardWidget")
@@ -44,6 +46,9 @@ class CardWidget(QFrame):
         self.art_label.setText("")
 
     def mousePressEvent(self, event):
+        if self.selectable:
+            self.setProperty("selected", not bool(self.property("selected")))
+            self.setStyleSheet("QFrame#CardWidget { background:#405c45; border:2px solid #e4b56a; border-radius:8px; }" if self.property("selected") else "QFrame#CardWidget { background:#25313a; border:1px solid #596775; border-radius:8px; }")
         self.clicked.emit(self.card.card_id)
         super().mousePressEvent(event)
 
@@ -112,10 +117,18 @@ class ZoneWidget(QFrame):
         # Compatibility no-op for legacy callers; production rendering uses CardWidget.
         return None
 
-    def selected_ids(self):
+    def selected_card_ids(self):
         return [w.card.card_id for w in self.findChildren(CardWidget) if w.property("selected")]
 
-    def currentItem(self):
-        cards = self.findChildren(CardWidget)
-        if not cards: return None
-        return type("CardItem", (), {"text": lambda self: cards[0].card.card_id})()
+    def selected_card_id(self):
+        ids = self.selected_card_ids()
+        return ids[0] if ids else None
+
+    def clear_selection(self):
+        for widget in self.findChildren(CardWidget):
+            widget.setProperty("selected", False)
+            widget.setStyleSheet("QFrame#CardWidget { background:#25313a; border:1px solid #596775; border-radius:8px; }")
+
+    # Backward-compatible name used only by existing Qt action code.
+    def selected_ids(self):
+        return self.selected_card_ids()
