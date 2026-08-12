@@ -11,6 +11,7 @@ class CardWidget(QFrame):
         super().__init__(parent)
         self.card = card
         self.selectable = bool(card.selectable)
+        self.setCursor(Qt.PointingHandCursor if self.selectable else Qt.ArrowCursor)
         self.setProperty("selected", False)
         self.asset_manager = asset_manager
         self._asset_base = CardCatalog.base_card_id(card.card_id)
@@ -51,6 +52,16 @@ class CardWidget(QFrame):
             self.setStyleSheet("QFrame#CardWidget { background:#405c45; border:2px solid #e4b56a; border-radius:8px; }" if self.property("selected") else "QFrame#CardWidget { background:#25313a; border:1px solid #596775; border-radius:8px; }")
         self.clicked.emit(self.card.card_id)
         super().mousePressEvent(event)
+
+    def enterEvent(self, event):
+        if self.selectable and not self.property("selected"):
+            self.setStyleSheet("QFrame#CardWidget { background:#344b60; border:2px solid #7fa8c9; border-radius:8px; }")
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        if not self.property("selected"):
+            self.setStyleSheet("QFrame#CardWidget { background:#25313a; border:1px solid #596775; border-radius:8px; }")
+        super().leaveEvent(event)
 
 
 class CardInspector(QDialog):
@@ -96,12 +107,21 @@ class ZoneWidget(QFrame):
         self.asset_manager = asset_manager
 
     def set_cards(self, cards):
+        cards = list(cards)
+        signature = tuple((card.card_id, card.tapped, card.selectable) for card in cards)
+        if signature == getattr(self, "_signature", None):
+            return
+        selected = set(self.selected_card_ids())
+        self._signature = signature
         while self.cards_layout.count():
             item = self.cards_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
         for card in cards:
             widget = CardWidget(card, asset_manager=self.asset_manager)
+            if card.card_id in selected:
+                widget.setProperty("selected", True)
+                widget.setStyleSheet("QFrame#CardWidget { background:#405c45; border:2px solid #e4b56a; border-radius:8px; }")
             widget.clicked.connect(self.card_clicked)
             self.cards_layout.addWidget(widget)
 

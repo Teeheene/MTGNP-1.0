@@ -258,9 +258,7 @@ class MainWindow(QMainWindow):
         self.your_battlefield_list.set_cards([self.presenter.card(card.get("id", str(card)), tapped=bool(card.get("tapped"))) for card in self.state.battlefield.get(self.state.pid, [])])
         self.opp_battlefield_list.set_cards([self.presenter.card(card.get("id", str(card)), selectable=False) for card in self.state.battlefield.get(opponent, [])])
         self.stack_list.set_cards([self.presenter.card(item.get("source", "Ability")) for item in self.state.stack])
-        for item in self.state.stack: self.stack_list.addItem(f"{item.get('source', 'Ability')} — {item.get('controller', '')}")
         self.exile_list.set_cards([self.presenter.card(card_id) for card_id in self.state.exile.get(self.state.pid, [])])
-        for card_id in self.state.exile.get(self.state.pid, []): self.exile_list.addItem(card_id)
 
     def inspect_card(self, card_id):
         self._inspector = CardInspector(self.presenter.card(card_id), self.asset_manager, self)
@@ -305,7 +303,10 @@ class MainWindow(QMainWindow):
                 )
         self._trigger_dialog_open = False
 
-    def on_pass_clicked(self): self.dispatcher.send_priority_pass()
+    def on_pass_clicked(self):
+        if self.state.phase != "LOBBY" and (self.state.priority_holder != self.state.pid or self.state.priority_seq_num is None):
+            self.log_text.setPlainText("You do not currently have priority."); return
+        self.dispatcher.send_priority_pass(); self.log_text.setPlainText("Priority pass submitted.")
 
     def on_mulligan(self):
         if self._mulligan_waiting or self._mulligan_kept:
@@ -336,7 +337,8 @@ class MainWindow(QMainWindow):
 
     def on_play_land_clicked(self):
         ids = self.hand_list.selected_ids()
-        if ids: self.dispatcher.send_play_land(ids[0])
+        if ids: self.dispatcher.send_play_land(ids[0]); self.log_text.setPlainText(f"Land play submitted: {ids[0]}.")
+        else: self.log_text.setPlainText("Select a card from your hand first.")
 
     def _select_target(self, card_id):
         data = self.catalog.get_card_data(card_id) or {}; base = CardCatalog.base_card_id(card_id)
@@ -353,7 +355,7 @@ class MainWindow(QMainWindow):
 
     def on_cast_spell_clicked(self):
         ids = self.hand_list.selected_ids()
-        if not ids: return
+        if not ids: self.log_text.setPlainText("Select a spell from your hand first."); return
         card_id = ids[0]; data = self.catalog.get_card_data(card_id) or {}; base = CardCatalog.base_card_id(card_id)
         targets = self._select_target(card_id) if "target" in data.get("text", "").casefold() else []
         mode = None
@@ -366,6 +368,7 @@ class MainWindow(QMainWindow):
             mode, ok = QInputDialog.getItem(self, "Healing Salve", "Mode:", ["GAIN_LIFE", "PREVENT_DAMAGE"], 0, False)
             if not ok: return
         self.dispatcher.send_cast_spell(card_id, targets=targets, mana_payment=payment, mode=mode)
+        self.log_text.setPlainText(f"Spell submitted: {card_id}.")
 
     def on_activate_clicked(self):
         ids = self.your_battlefield_list.selected_ids()
@@ -374,12 +377,15 @@ class MainWindow(QMainWindow):
             data = self.catalog.get_card_data(source_id) or {}
             targets = self._select_target(source_id) if "target" in data.get("text", "").casefold() else []
             self.dispatcher.send_activate_ability(source_id, targets=targets, cost_payment={"tap": True, "mana": {}})
+            self.log_text.setPlainText(f"Ability submitted: {source_id}.")
+        else: self.log_text.setPlainText("Select a permanent to activate.")
 
     def on_attack_clicked(self):
-        if self.state.phase != "DECLARE_ATTACKERS": return
+        if self.state.phase != "DECLARE_ATTACKERS": self.log_text.setPlainText("Attackers can only be declared during DECLARE_ATTACKERS."); return
         ids = self.your_battlefield_list.selected_card_ids()
         opponent = self.presenter.opponent_id()
         self.dispatcher.send_declare_attackers([{"creature_id": card_id, "target": opponent} for card_id in ids])
+        self.log_text.setPlainText("Attackers submitted.")
 
     def on_block_clicked(self):
         attackers = self.state.attackers or []
@@ -403,7 +409,8 @@ class MainWindow(QMainWindow):
 
     def on_suspend_clicked(self):
         ids = self.hand_list.selected_ids()
-        if ids and CardCatalog.base_card_id(ids[0]) == "rift_bolt": self.dispatcher.send_suspend_card(ids[0], {"R": 1})
+        if ids and CardCatalog.base_card_id(ids[0]) == "rift_bolt": self.dispatcher.send_suspend_card(ids[0], {"R": 1}); self.log_text.setPlainText("Suspend submitted.")
+        else: self.log_text.setPlainText("Select Rift Bolt to suspend.")
 
     def closeEvent(self, event):
         self.dispatcher.connection.close()
