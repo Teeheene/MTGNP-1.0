@@ -269,7 +269,7 @@ class MainWindow(QMainWindow):
 
     def _refresh_actions(self, phase):
         usable = self.state.priority_holder == self.state.pid and self.state.priority_seq_num is not None
-        self.pass_btn.setEnabled(usable or phase == "LOBBY"); self.play_land_btn.setEnabled(usable and phase in {"PRECOMBAT_MAIN", "POSTCOMBAT_MAIN"})
+        self.pass_btn.setEnabled(usable or phase == "LOBBY"); self.play_land_btn.setEnabled(usable and phase in {"PRECOMBAT_MAIN", "POSTCOMBAT_MAIN"} and self.state.active_player == self.state.pid and not self.state.land_played_this_turn)
         self.cast_spell_btn.setEnabled(usable); self.activate_btn.setEnabled(usable)
         self.attack_btn.setEnabled(phase == "DECLARE_ATTACKERS" and self.state.active_player == self.state.pid)
         self.block_btn.setEnabled(phase == "DECLARE_BLOCKERS" and self.state.active_player != self.state.pid)
@@ -354,8 +354,16 @@ class MainWindow(QMainWindow):
 
     def on_play_land_clicked(self):
         ids = self.hand_list.selected_ids()
-        if ids: self.dispatcher.send_play_land(ids[0]); self.log_text.setPlainText(f"Land play submitted: {ids[0]}.")
-        else: self.log_text.setPlainText("Select a card from your hand first.")
+        if self.state.active_player != self.state.pid or self.state.phase not in {"PRECOMBAT_MAIN", "POSTCOMBAT_MAIN"}:
+            self.log_text.setPlainText("You can only play a land during your own main phase."); return
+        if self.state.land_played_this_turn:
+            self.log_text.setPlainText("You have already played a land this turn."); return
+        if len(ids) != 1:
+            self.log_text.setPlainText("Select a land from your hand first."); return
+        data = self.catalog.get_card_data(ids[0]) or {}
+        if "land" not in data.get("card_type", "").casefold():
+            self.log_text.setPlainText("The selected card is not a land."); return
+        self.dispatcher.send_play_land(ids[0]); self.log_text.setPlainText(f"Land play submitted: {ids[0]}.")
 
     def _select_target(self, card_id):
         data = self.catalog.get_card_data(card_id) or {}; base = CardCatalog.base_card_id(card_id)

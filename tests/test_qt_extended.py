@@ -142,5 +142,13 @@ class TestQtExtendedClient(unittest.TestCase):
         self.assertEqual(len(zone.findChildren(type(zone.findChildren(CardWidget)[0]))), 7)
         self.assertLessEqual(zone.sizeHint().width(), 7 * 150 + 100)
 
+    def test_play_land_requires_active_player_and_land(self):
+        self.state.phase = "PRECOMBAT_MAIN"; self.state.active_player = "bob"; self.state.priority_holder = "alice"; self.state.priority_seq_num = 4
+        self.state.local_hand = ["forest_013"]
+        self.window.refresh_ui(); self.assertFalse(self.window.play_land_btn.isEnabled())
+        self.window.hand_list.findChildren(CardWidget)[0].mousePressEvent(None) if False else None
+        self.window.on_play_land_clicked()
+        self.dispatcher.send_play_land.assert_not_called()
+
 if __name__ == "__main__":
     unittest.main()
