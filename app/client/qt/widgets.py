@@ -1,5 +1,5 @@
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout, QDialog, QSizePolicy, QHBoxLayout
+from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout, QDialog, QSizePolicy, QHBoxLayout, QScrollArea, QWidget
 from PySide6.QtGui import QPixmap
 from app.shared.card_catalog import CardCatalog
 
@@ -10,6 +10,7 @@ class CardWidget(QFrame):
     def __init__(self, card, parent=None, asset_manager=None, variant="full"):
         super().__init__(parent)
         self.card = card
+        self._asset_variant = variant
         self.selectable = bool(card.selectable)
         self.setCursor(Qt.PointingHandCursor if self.selectable else Qt.ArrowCursor)
         self.setProperty("selected", False)
@@ -43,7 +44,7 @@ class CardWidget(QFrame):
             asset_manager.request(card.card_id, variant)
 
     def _on_image_ready(self, base_id, variant, pixmap):
-        if base_id != self._asset_base or variant != "art" or self.card is None: return
+        if base_id != self._asset_base or variant != self._asset_variant or self.card is None: return
         self.art_label.setPixmap(pixmap.scaled(self.art_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
         self.art_label.setText("")
 
@@ -104,7 +105,14 @@ class ZoneWidget(QFrame):
         self.title.setStyleSheet("font-weight:700; color:#e3b56a;")
         self.layout.addWidget(self.title)
         self.cards_layout = QHBoxLayout()
-        self.layout.addLayout(self.cards_layout)
+        self.cards_host = QWidget()
+        self.cards_host.setLayout(self.cards_layout)
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(False)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll.setWidget(self.cards_host)
+        self.layout.addWidget(self.scroll)
         self.asset_manager = asset_manager
 
     def set_cards(self, cards):

@@ -2,12 +2,14 @@ import unittest
 from unittest.mock import MagicMock
 
 from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QPixmap
 
 from app.client.qt.dialogs import CardChoiceDialog
 from app.client.qt.main_window import CATALOG_PATH, MainWindow
 from app.client.qt.presenter import GamePresenter
 from app.client.state import ClientState
 from app.shared.card_catalog import CardCatalog
+from app.client.qt.widgets import CardWidget, ZoneWidget
 
 app = QApplication.instance() or QApplication([])
 
@@ -115,6 +117,30 @@ class TestQtExtendedClient(unittest.TestCase):
         self.window.keep_btn.click()
         self.dispatcher.send_mulligan_choice.assert_not_called()
         self.assertIn("Select exactly 0", self.window.mulligan_status.text())
+
+    def test_full_card_art_callback_and_variant_filter(self):
+        manager = MagicMock()
+        card = GamePresenter(self.state, CardCatalog(CATALOG_PATH)).card("forest_001")
+        widget = CardWidget(card, asset_manager=manager, variant="full")
+        self.assertEqual(manager.request.call_args.args, ("forest_001", "full"))
+        pixmap = QPixmap(20, 20)
+        widget._on_image_ready("forest", "art", pixmap)
+        self.assertEqual(widget.art_label.text(), "No artwork cached")
+        widget._on_image_ready("forest", "full", pixmap)
+        self.assertTrue(widget.art_label.pixmap() is not None)
+        self.assertEqual(widget.art_label.text(), "")
+
+    def test_zone_uses_horizontal_scroll_area_for_fixed_cards(self):
+        catalog = CardCatalog(CATALOG_PATH)
+        zone = ZoneWidget("Hand")
+        cards = []
+        for i in range(1, 8):
+            cards.append(GamePresenter(self.state, catalog).card(f"forest_{i:03d}"))
+        zone.set_cards(cards)
+        self.assertEqual(zone.scroll.horizontalScrollBarPolicy().value, 0)
+        self.assertEqual(zone.scroll.verticalScrollBarPolicy().value, 1)
+        self.assertEqual(len(zone.findChildren(type(zone.findChildren(CardWidget)[0]))), 7)
+        self.assertLessEqual(zone.sizeHint().width(), 7 * 150 + 100)
 
 
 if __name__ == "__main__":
