@@ -104,6 +104,9 @@ class MainWindow(QMainWindow):
         row.addWidget(self.keep_btn); row.addWidget(self.mull_btn); layout.addLayout(row)
         self.pages.addWidget(page)
 
+    def _mulligan_cards_selected(self):
+        return [self.mulligan_hand.item(i).text() for i in range(self.mulligan_hand.count()) if self.mulligan_hand.item(i).isSelected()]
+
     def _build_game_page(self):
         page = QWidget(); layout = QVBoxLayout(page)
         board = QHBoxLayout(); left = QVBoxLayout(); right = QVBoxLayout()
@@ -271,14 +274,22 @@ class MainWindow(QMainWindow):
     def on_pass_clicked(self): self.dispatcher.send_priority_pass()
 
     def on_mulligan(self):
-        cards = [item.text() for item in self.mulligan_hand.selectedItems()]
         self._mulligan_count += 1
         self.dispatcher.send_mulligan_choice(False, cards_to_bottom=[])
+        self.log_text.setPlainText("Mulligan requested. A fresh hand is required before keeping.")
 
     def on_keep(self):
-        cards = [item.text() for item in self.mulligan_hand.selectedItems()]
-        if len(cards) == self._mulligan_count:
-            self.dispatcher.send_mulligan_choice(True, cards_to_bottom=cards)
+        cards = self._mulligan_cards_selected()
+        required = self._mulligan_count
+        if len(cards) != required:
+            self.log_text.setPlainText(
+                f"Select exactly {required} card(s) to bottom before keeping."
+            )
+            return
+        self.dispatcher.send_mulligan_choice(True, cards_to_bottom=cards)
+        self.keep_btn.setEnabled(False)
+        self.mull_btn.setEnabled(False)
+        self.lobby_status.setText("Hand kept. Waiting for opponent.")
 
     def on_play_land_clicked(self):
         ids = self.hand_list.selected_ids()

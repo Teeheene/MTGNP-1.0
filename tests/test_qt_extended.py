@@ -81,6 +81,28 @@ class TestQtExtendedClient(unittest.TestCase):
         self.assertEqual(self.window.connection_error.text(), "")
         self.assertEqual(self.window.pages.currentIndex(), 0)  # Connection page
 
+    def test_initial_keep_sends_empty_bottom(self):
+        self.state.phase = "MULLIGAN"
+        self.state.mulligan_seq_num = 50
+        self.state.local_hand = ["forest_001", "forest_002"]
+        self.window.refresh_ui()
+        self.window.keep_btn.click()
+        self.dispatcher.send_mulligan_choice.assert_called_once_with(True, cards_to_bottom=[])
+
+    def test_one_mulligan_keep_requires_one_current_card(self):
+        self.state.phase = "MULLIGAN"
+        self.state.mulligan_seq_num = 51
+        self.state.local_hand = ["forest_001", "forest_002"]
+        self.window.refresh_ui()
+        self.window.mull_btn.click()
+        self.dispatcher.send_mulligan_choice.assert_called_once_with(False, cards_to_bottom=[])
+        self.dispatcher.reset_mock()
+        self.window.state.local_hand = ["forest_003", "forest_004"]
+        self.window.refresh_ui()
+        self.window.mulligan_hand.item(1).setSelected(True)
+        self.window.keep_btn.click()
+        self.dispatcher.send_mulligan_choice.assert_called_once_with(True, cards_to_bottom=["forest_004"])
+
 
 if __name__ == "__main__":
     unittest.main()
