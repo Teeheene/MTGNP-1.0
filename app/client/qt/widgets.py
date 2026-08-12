@@ -1,5 +1,5 @@
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout, QDialog, QSizePolicy, QHBoxLayout, QScrollArea, QWidget
+from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout, QDialog, QSizePolicy, QHBoxLayout, QScrollArea, QWidget, QLayout
 from PySide6.QtGui import QPixmap
 from app.shared.card_catalog import CardCatalog
 
@@ -105,12 +105,17 @@ class ZoneWidget(QFrame):
         self.title.setStyleSheet("font-weight:700; color:#e3b56a;")
         self.layout.addWidget(self.title)
         self.cards_layout = QHBoxLayout()
+        self.cards_layout.setContentsMargins(0, 0, 0, 0)
+        self.cards_layout.setSpacing(8)
+        self.cards_layout.setSizeConstraint(QLayout.SetFixedSize)
         self.cards_host = QWidget()
         self.cards_host.setLayout(self.cards_layout)
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(False)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll.setMinimumHeight(232)
+        self.scroll.setMaximumHeight(245)
         self.scroll.setWidget(self.cards_host)
         self.layout.addWidget(self.scroll)
         self.asset_manager = asset_manager
@@ -133,6 +138,7 @@ class ZoneWidget(QFrame):
                 widget.setStyleSheet("QFrame#CardWidget { background:#405c45; border:2px solid #e4b56a; border-radius:8px; }")
             widget.clicked.connect(self.card_clicked)
             self.cards_layout.addWidget(widget)
+        self.cards_host.adjustSize()
 
     def count(self):
         return self.cards_layout.count()

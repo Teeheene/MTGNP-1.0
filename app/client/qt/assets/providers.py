@@ -30,6 +30,7 @@ class ScryfallProvider(QObject):
         key = (base_id, variant)
         self._pending.pop(key, None)
         if reply.error():
+            print(f"[QT ASSET] lookup failed for {base_id}: {reply.errorString()}")
             self.failed.emit(base_id, variant); reply.deleteLater(); return
         try:
             data = json.loads(bytes(reply.readAll()))

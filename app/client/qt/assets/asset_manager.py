@@ -50,18 +50,29 @@ class AssetManager(QObject):
         return directory / f"{base}.png"
 
     def _download(self, base, variant, url):
-        reply = self.network.get(QNetworkRequest(QUrl(url)))
+        request = QNetworkRequest(QUrl(url))
+        request.setRawHeader(b"User-Agent", b"MTGNP-DLSU/1.0")
+        request.setRawHeader(b"Accept", b"image/*,*/*;q=0.8")
+        reply = self.network.get(request)
         reply.finished.connect(lambda: self._on_download(reply, base, variant))
 
     def _on_download(self, reply, base, variant):
         key = (base, variant); self._pending.pop(key, None)
+        error = reply.errorString() if hasattr(reply, "errorString") else "unknown error"
+        if reply.error():
+            print(f"[QT ASSET] image download failed for {base}: {error}")
+            self._failed_image(base, variant)
+            reply.deleteLater(); return
         pixmap = QPixmap(); pixmap.loadFromData(bytes(reply.readAll()))
-        if reply.error() or pixmap.isNull(): self._failed_image(base, variant)
+        if pixmap.isNull():
+            print(f"[QT ASSET] invalid image data for {base}")
+            self._failed_image(base, variant)
         else:
             self.memory[key] = pixmap
             try: pixmap.save(str(self._path(base, variant)))
             except OSError: pass
             self.image_ready.emit(base, variant, pixmap)
+            print(f"[QT ASSET] loaded {base} {variant}")
         reply.deleteLater()
 
     def _failed_image(self, base, variant):
