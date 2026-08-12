@@ -102,6 +102,19 @@ class TestQtExtendedClient(unittest.TestCase):
         self.window.mulligan_hand.item(1).setSelected(True)
         self.window.keep_btn.click()
         self.dispatcher.send_mulligan_choice.assert_called_once_with(True, cards_to_bottom=["forest_004"])
+        self.assertIn("Hand kept. Waiting for opponent", self.window.mulligan_status.text())
+
+    def test_mulligan_selection_survives_unrelated_refresh_and_invalid_count_is_visible(self):
+        self.state.phase = "MULLIGAN"
+        self.state.local_hand = ["forest_001", "forest_002"]
+        self.window.refresh_ui()
+        self.window.mulligan_hand.item(0).setSelected(True)
+        self.state.last_pong_timestamp = 123
+        self.window.refresh_ui()
+        self.assertTrue(self.window.mulligan_hand.item(0).isSelected())
+        self.window.keep_btn.click()
+        self.dispatcher.send_mulligan_choice.assert_not_called()
+        self.assertIn("Select exactly 0", self.window.mulligan_status.text())
 
 
 if __name__ == "__main__":

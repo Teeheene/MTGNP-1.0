@@ -34,6 +34,10 @@ class MainWindow(QMainWindow):
         self._trigger_dialog_open = False
         self._selected_attackers = []
         self._mulligan_count = 0
+        self._mulligan_hand_ids = None
+        self._mulligan_waiting = False
+        self._mulligan_kept = False
+        self._last_phase = None
         self._ready_sent = False
         self.setWindowTitle(f"MTGNP 1.0 Client — Player: {state.pid}")
         self.resize(1366, 820)
@@ -98,6 +102,9 @@ class MainWindow(QMainWindow):
     def _build_mulligan_page(self):
         page = QWidget(); layout = QVBoxLayout(page)
         layout.addWidget(QLabel("3. MULLIGAN DECISION"))
+        self.mulligan_status = QLabel("Keep this hand, or mulligan for a new hand.")
+        self.mulligan_status.setObjectName("Status")
+        layout.addWidget(self.mulligan_status)
         self.mulligan_hand = QListWidget(); self.mulligan_hand.setSelectionMode(QListWidget.MultiSelection); layout.addWidget(self.mulligan_hand)
         row = QHBoxLayout(); self.keep_btn = QPushButton("KEEP"); self.keep_btn.setObjectName("Primary"); self.keep_btn.clicked.connect(self.on_keep)
         self.mull_btn = QPushButton("MULLIGAN"); self.mull_btn.setObjectName("Danger"); self.mull_btn.clicked.connect(self.on_mulligan)
@@ -177,12 +184,20 @@ class MainWindow(QMainWindow):
 
     def send_rematch(self):
         self.state.reset_for_lobby()
+        self._mulligan_count = 0
+        self._mulligan_hand_ids = None
+        self._mulligan_waiting = False
+        self._mulligan_kept = False
         self.dispatcher.send_player_ready()
 
     def close_connection(self):
         self.dispatcher.connection.close()
         self.state.connected = False
         self.state.reset_for_lobby()
+        self._mulligan_count = 0
+        self._mulligan_hand_ids = None
+        self._mulligan_waiting = False
+        self._mulligan_kept = False
 
         self.connect_btn.setEnabled(True)
         self._ready_sent = False
@@ -192,6 +207,12 @@ class MainWindow(QMainWindow):
 
     def refresh_ui(self):
         phase = self.state.phase or self.state.current_state.get("phase", "LOBBY")
+        if phase == "MULLIGAN" and self._last_phase != "MULLIGAN":
+            self._mulligan_count = 0
+            self._mulligan_hand_ids = None
+            self._mulligan_waiting = False
+            self._mulligan_kept = False
+        self._last_phase = phase
         turn = self.state.turn or self.state.current_state.get("turn", 0)
         holder = self.state.priority_holder or "None"
         self.status_label.setText(f"Phase: {phase} | Turn: {turn} | Priority: {holder}")
@@ -217,9 +238,22 @@ class MainWindow(QMainWindow):
             self.log_text.setPlainText(f"{error.get('code', 'ERROR')}: {error.get('message', '')}")
 
     def _refresh_lists(self, opponent):
-        self.mulligan_hand.clear()
-        for card_id in self.state.local_hand:
-            self.mulligan_hand.addItem(card_id)
+        hand_ids = tuple(self.state.local_hand)
+        if hand_ids != self._mulligan_hand_ids:
+            self.mulligan_hand.clear()
+            for card_id in hand_ids:
+                self.mulligan_hand.addItem(card_id)
+            self._mulligan_hand_ids = hand_ids
+            if self._mulligan_waiting:
+                self._mulligan_waiting = False
+                self.keep_btn.setEnabled(True)
+                self.mull_btn.setEnabled(True)
+                required = self._mulligan_count
+                self.mulligan_status.setText(
+                    "Keep this hand, or mulligan again."
+                    if required == 0 else
+                    f"Select exactly {required} card(s) to bottom, then KEEP."
+                )
         self.hand_list.set_cards([self.presenter.card(card_id) for card_id in self.state.local_hand])
         self.your_battlefield_list.set_cards([self.presenter.card(card.get("id", str(card)), tapped=bool(card.get("tapped"))) for card in self.state.battlefield.get(self.state.pid, [])])
         self.opp_battlefield_list.set_cards([self.presenter.card(card.get("id", str(card)), selectable=False) for card in self.state.battlefield.get(opponent, [])])
@@ -274,21 +308,30 @@ class MainWindow(QMainWindow):
     def on_pass_clicked(self): self.dispatcher.send_priority_pass()
 
     def on_mulligan(self):
+        if self._mulligan_waiting or self._mulligan_kept:
+            return
         self._mulligan_count += 1
+        self._mulligan_waiting = True
+        self.keep_btn.setEnabled(False)
+        self.mull_btn.setEnabled(False)
+        self.mulligan_status.setText("Mulligan sent. Waiting for new hand...")
         self.dispatcher.send_mulligan_choice(False, cards_to_bottom=[])
-        self.log_text.setPlainText("Mulligan requested. A fresh hand is required before keeping.")
 
     def on_keep(self):
+        if self._mulligan_waiting or self._mulligan_kept:
+            return
         cards = self._mulligan_cards_selected()
         required = self._mulligan_count
         if len(cards) != required:
-            self.log_text.setPlainText(
+            self.mulligan_status.setText(
                 f"Select exactly {required} card(s) to bottom before keeping."
             )
             return
         self.dispatcher.send_mulligan_choice(True, cards_to_bottom=cards)
         self.keep_btn.setEnabled(False)
         self.mull_btn.setEnabled(False)
+        self._mulligan_kept = True
+        self.mulligan_status.setText("Hand kept. Waiting for opponent...")
         self.lobby_status.setText("Hand kept. Waiting for opponent.")
 
     def on_play_land_clicked(self):
