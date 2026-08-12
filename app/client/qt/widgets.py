@@ -6,6 +6,7 @@ from app.shared.card_catalog import CardCatalog
 
 class CardWidget(QFrame):
     clicked = Signal(str)
+    inspect_requested = Signal(str)
 
     def __init__(self, card, parent=None, asset_manager=None, variant="full"):
         super().__init__(parent)
@@ -55,6 +56,11 @@ class CardWidget(QFrame):
         self.clicked.emit(self.card.card_id)
         super().mousePressEvent(event)
 
+    def mouseDoubleClickEvent(self, event):
+        if self.selectable or self.card:
+            self.inspect_requested.emit(self.card.card_id)
+        super().mouseDoubleClickEvent(event)
+
     def enterEvent(self, event):
         if self.selectable and not self.property("selected"):
             self.setStyleSheet("QFrame#CardWidget { background:#344b60; border:2px solid #7fa8c9; border-radius:8px; }")
@@ -97,6 +103,7 @@ class CardInspector(QDialog):
 
 class ZoneWidget(QFrame):
     card_clicked = Signal(str)
+    inspect_requested = Signal(str)
 
     def __init__(self, title, parent=None, asset_manager=None):
         super().__init__(parent)
@@ -137,6 +144,7 @@ class ZoneWidget(QFrame):
                 widget.setProperty("selected", True)
                 widget.setStyleSheet("QFrame#CardWidget { background:#405c45; border:2px solid #e4b56a; border-radius:8px; }")
             widget.clicked.connect(self.card_clicked)
+            widget.inspect_requested.connect(self.inspect_requested)
             self.cards_layout.addWidget(widget)
         self.cards_host.adjustSize()
 

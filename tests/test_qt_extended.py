@@ -142,6 +142,5 @@ class TestQtExtendedClient(unittest.TestCase):
         self.assertEqual(len(zone.findChildren(type(zone.findChildren(CardWidget)[0]))), 7)
         self.assertLessEqual(zone.sizeHint().width(), 7 * 150 + 100)
 
-
 if __name__ == "__main__":
     unittest.main()

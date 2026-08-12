@@ -135,7 +135,7 @@ class MainWindow(QMainWindow):
         self.rematch_btn.clicked.connect(self.send_rematch); right.addWidget(self.rematch_btn)
         board.addLayout(left, 3); board.addLayout(right, 2); layout.addLayout(board, 1)
         for zone in (self.opp_battlefield_list, self.your_battlefield_list, self.hand_list, self.stack_list, self.exile_list):
-            zone.card_clicked.connect(self.inspect_card)
+            zone.inspect_requested.connect(self.inspect_card)
         actions = QHBoxLayout()
         self.pass_btn = QPushButton("PASS PRIORITY"); self.pass_btn.clicked.connect(self.on_pass_clicked)
         self.play_land_btn = QPushButton("PLAY LAND"); self.play_land_btn.clicked.connect(self.on_play_land_clicked)
@@ -146,6 +146,8 @@ class MainWindow(QMainWindow):
         self.order_btn = QPushButton("CONFIRM ORDER"); self.order_btn.clicked.connect(self.on_damage_order_clicked)
         self.suspend_btn = QPushButton("SUSPEND"); self.suspend_btn.clicked.connect(self.on_suspend_clicked)
         self.concede_btn = QPushButton("CONCEDE"); self.concede_btn.setObjectName("Danger"); self.concede_btn.clicked.connect(lambda: self.dispatcher.send_concede())
+        self.action_hint = QLabel("What to do: waiting for game state..."); self.action_hint.setObjectName("Status")
+        layout.addWidget(self.action_hint)
         for button in (self.pass_btn, self.play_land_btn, self.cast_spell_btn, self.activate_btn, self.attack_btn, self.block_btn, self.order_btn, self.suspend_btn, self.concede_btn): actions.addWidget(button)
         layout.addLayout(actions); self.pages.addWidget(page)
 
@@ -225,6 +227,7 @@ class MainWindow(QMainWindow):
         else: self.pages.setCurrentWidget(self.pages.widget(3))
         self._refresh_lists(opponent)
         self._refresh_actions(phase)
+        self._refresh_guidance(phase, holder, opponent)
         self._refresh_choice()
         self._refresh_trigger_prompt()
         info = self.state.game_over_info or {}
@@ -273,6 +276,20 @@ class MainWindow(QMainWindow):
         self.order_btn.setEnabled(phase == "ASSIGN_DAMAGE_ORDER" and bool(self.state.pending_damage_orders))
         self.suspend_btn.setEnabled(usable and phase in {"PRECOMBAT_MAIN", "POSTCOMBAT_MAIN"})
         self.concede_btn.setEnabled(True)
+        self.play_land_btn.setToolTip("You can play a land during a main phase.")
+        self.cast_spell_btn.setToolTip("You need priority to cast a spell.")
+        self.attack_btn.setToolTip("Attackers are declared during DECLARE_ATTACKERS.")
+        self.block_btn.setToolTip("Blockers are declared during DECLARE_BLOCKERS.")
+
+    def _refresh_guidance(self, phase, holder, opponent):
+        if phase == "GAME_OVER": text = "What to do: choose REMATCH to play again using the same connection."
+        elif phase == "DECLARE_ATTACKERS": text = "What to do: select creatures to attack, then CONFIRM ATTACKERS."
+        elif phase == "DECLARE_BLOCKERS": text = "What to do: select blockers, then CONFIRM BLOCKERS."
+        elif holder == self.state.pid and phase in {"UPKEEP", "DRAW"}: text = "What to do: you have priority; usually PASS PRIORITY to continue."
+        elif holder == self.state.pid and phase in {"PRECOMBAT_MAIN", "POSTCOMBAT_MAIN"}: text = "What to do: select a land, cast a spell, or PASS PRIORITY."
+        elif holder and holder != self.state.pid: text = f"What to do: waiting for {holder}."
+        else: text = "What to do: waiting for the server."
+        self.action_hint.setText(text)
 
     def _refresh_choice(self):
         request = self.state.pending_card_choice
