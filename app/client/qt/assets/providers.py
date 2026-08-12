@@ -21,7 +21,8 @@ class ScryfallProvider(QObject):
             return
         self._pending[key] = True
         request = QNetworkRequest(QUrl("https://api.scryfall.com/cards/named?exact=" + quote(card_name)))
-        request.setHeader(QNetworkRequest.UserAgentHeader, "MTGNP-1.0-University-Client/1.0")
+        request.setRawHeader(b"User-Agent", b"MTGNP-DLSU/1.0")
+        request.setRawHeader(b"Accept", b"application/json;q=0.9,*/*;q=0.8")
         reply = self.network.get(request)
         reply.finished.connect(lambda: self._on_lookup(reply, base_id, variant))
 
@@ -33,7 +34,7 @@ class ScryfallProvider(QObject):
         try:
             data = json.loads(bytes(reply.readAll()))
             images = data.get("image_uris", {})
-            url = images.get("art_crop" if variant == "art" else "png") or images.get("normal")
+            url = images.get("normal") or images.get("png") or images.get("art_crop")
             if url: self.resolved.emit(base_id, variant, url)
             else: self.failed.emit(base_id, variant)
         except (ValueError, TypeError):

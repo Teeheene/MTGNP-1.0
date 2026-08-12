@@ -1,5 +1,5 @@
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout, QDialog
+from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout, QDialog, QSizePolicy, QHBoxLayout
 from PySide6.QtGui import QPixmap
 from app.shared.card_catalog import CardCatalog
 
@@ -7,7 +7,7 @@ from app.shared.card_catalog import CardCatalog
 class CardWidget(QFrame):
     clicked = Signal(str)
 
-    def __init__(self, card, parent=None, asset_manager=None, variant="art"):
+    def __init__(self, card, parent=None, asset_manager=None, variant="full"):
         super().__init__(parent)
         self.card = card
         self.selectable = bool(card.selectable)
@@ -16,7 +16,8 @@ class CardWidget(QFrame):
         self.asset_manager = asset_manager
         self._asset_base = CardCatalog.base_card_id(card.card_id)
         self.setObjectName("CardWidget")
-        self.setMinimumSize(130, 170)
+        self.setFixedSize(150, 210)
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(8, 6, 8, 6)
         self.name_label = QLabel(card.name)
@@ -102,7 +103,7 @@ class ZoneWidget(QFrame):
         self.title = QLabel(title)
         self.title.setStyleSheet("font-weight:700; color:#e3b56a;")
         self.layout.addWidget(self.title)
-        self.cards_layout = QVBoxLayout()
+        self.cards_layout = QHBoxLayout()
         self.layout.addLayout(self.cards_layout)
         self.asset_manager = asset_manager
 

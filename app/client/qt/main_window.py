@@ -124,8 +124,8 @@ class MainWindow(QMainWindow):
         self.stack_list = ZoneWidget("The Stack", asset_manager=self.asset_manager)
         self.exile_list = ZoneWidget("Your Exile / Suspended Cards", asset_manager=self.asset_manager)
         self.log_text = QTextEdit(); self.log_text.setReadOnly(True)
-        for title, widget in (("Opponent Battlefield", self.opp_battlefield_list), ("Your Battlefield", self.your_battlefield_list), ("Your Hand", self.hand_list)):
-            left.addWidget(QLabel(title)); left.addWidget(widget, 1)
+        for widget in (self.opp_battlefield_list, self.your_battlefield_list, self.hand_list):
+            left.addWidget(widget, 1)
         right.addWidget(self.stack_list, 2)
         right.addWidget(self.exile_list, 1)
         right.addWidget(QLabel("Status / Errors")); right.addWidget(self.log_text, 1)
@@ -343,9 +343,12 @@ class MainWindow(QMainWindow):
     def _select_target(self, card_id):
         data = self.catalog.get_card_data(card_id) or {}; base = CardCatalog.base_card_id(card_id)
         opponent = self.presenter.opponent_id()
+        text = data.get("text", "").casefold()
         if base in {"counterspell", "cancel", "mana_leak", "negate"}:
             options = [str(item.get("stack_item_id")) for item in self.state.stack if item.get("item_type") == "SPELL"]
-        elif base in {"lava_spike", "ponder", "mind_rot"}:
+        elif "target creature" in text:
+            options = [p.get("id") for pid in self.state.battlefield for p in self.state.battlefield.get(pid, []) if "creature" in (self.catalog.get_card_data(p.get("id", "")) or {}).get("card_type", "").casefold()]
+        elif "target player" in text and "any target" not in text:
             options = [opponent] if opponent else []
         else:
             options = [opponent] if opponent else []
@@ -357,6 +360,9 @@ class MainWindow(QMainWindow):
         ids = self.hand_list.selected_ids()
         if not ids: self.log_text.setPlainText("Select a spell from your hand first."); return
         card_id = ids[0]; data = self.catalog.get_card_data(card_id) or {}; base = CardCatalog.base_card_id(card_id)
+        if "land" in data.get("card_type", "").casefold():
+            self.log_text.setPlainText("Lands are played with PLAY LAND.")
+            return
         targets = self._select_target(card_id) if "target" in data.get("text", "").casefold() else []
         mode = None
         payment = {"X" if key == "Generic" else key: value for key, value in data.get("mana_cost", {}).items() if value}
