@@ -67,6 +67,8 @@ class MainWindow(QMainWindow):
             QGroupBox::title { subcontrol-origin:margin; left:10px; color:#e4b56a; }
             QPushButton { background:#273646; border:1px solid #506276; border-radius:6px; padding:9px 14px; }
             QPushButton:hover { background:#35506a; }
+            QPushButton:disabled { background:#161d24; color:#65717d; border:1px solid #28323c; }
+            QPushButton:disabled:hover { background:#161d24; color:#65717d; border:1px solid #28323c; }
             QPushButton#Primary { background:#b66a27; border-color:#e4a45c; font-weight:700; }
             QPushButton#Danger { background:#79343d; }
             QListWidget, QTextEdit, QLineEdit, QComboBox { background:#18232d; border:1px solid #354352; border-radius:5px; padding:5px; }
@@ -217,7 +219,8 @@ class MainWindow(QMainWindow):
         self._last_phase = phase
         turn = self.state.turn or self.state.current_state.get("turn", 0)
         holder = self.state.priority_holder or "None"
-        self.status_label.setText(f"Phase: {phase} | Turn: {turn} | Priority: {holder}")
+        holder_display = "YOU" if holder == self.state.pid else holder
+        self.status_label.setText(f"Phase: {phase} | Turn: {turn} | Priority: {holder_display}")
         opponent = self.presenter.opponent_id() or "Opponent"
         self.life_label.setText(f"Life Totals — You ({self.state.pid}): {self.state.life_totals.get(self.state.pid, 20)} | Opponent ({opponent}): {self.state.life_totals.get(opponent, 20)}")
         if phase == "LOBBY": self.pages.setCurrentWidget(self.pages.widget(1 if self.state.connected else 0))
@@ -276,18 +279,23 @@ class MainWindow(QMainWindow):
         self.order_btn.setEnabled(phase == "ASSIGN_DAMAGE_ORDER" and bool(self.state.pending_damage_orders))
         self.suspend_btn.setEnabled(usable and phase in {"PRECOMBAT_MAIN", "POSTCOMBAT_MAIN"})
         self.concede_btn.setEnabled(True)
-        self.play_land_btn.setToolTip("You can play a land during a main phase.")
+        self.play_land_btn.setToolTip("You can play a land only during your own main phase.")
         self.cast_spell_btn.setToolTip("You need priority to cast a spell.")
-        self.attack_btn.setToolTip("Attackers are declared during DECLARE_ATTACKERS.")
-        self.block_btn.setToolTip("Blockers are declared during DECLARE_BLOCKERS.")
+        self.attack_btn.setToolTip("Only the active player declares attackers.")
+        self.block_btn.setToolTip("The defending player declares blockers.")
 
     def _refresh_guidance(self, phase, holder, opponent):
+        local_active = self.state.active_player == self.state.pid
         if phase == "GAME_OVER": text = "What to do: choose REMATCH to play again using the same connection."
-        elif phase == "DECLARE_ATTACKERS": text = "What to do: select creatures to attack, then CONFIRM ATTACKERS."
-        elif phase == "DECLARE_BLOCKERS": text = "What to do: select blockers, then CONFIRM BLOCKERS."
-        elif holder == self.state.pid and phase in {"UPKEEP", "DRAW"}: text = "What to do: you have priority; usually PASS PRIORITY to continue."
-        elif holder == self.state.pid and phase in {"PRECOMBAT_MAIN", "POSTCOMBAT_MAIN"}: text = "What to do: select a land, cast a spell, or PASS PRIORITY."
+        elif phase == "DECLARE_ATTACKERS": text = "What to do: select your attacking creatures, then CONFIRM ATTACKERS." if local_active else f"What to do: waiting for {self.state.active_player} to declare attackers."
+        elif phase == "DECLARE_BLOCKERS": text = f"What to do: waiting for {opponent} to declare blockers." if local_active else "What to do: select your blockers, then CONFIRM BLOCKERS."
         elif holder and holder != self.state.pid: text = f"What to do: waiting for {holder}."
+        elif phase in {"UPKEEP", "DRAW"} and holder == self.state.pid: text = "What to do: you have priority. Usually PASS PRIORITY to continue."
+        elif phase in {"PRECOMBAT_MAIN", "POSTCOMBAT_MAIN"} and holder == self.state.pid and local_active:
+            text = "What to do: cast a spell or PASS PRIORITY." if self.state.land_played_this_turn else "What to do: select a land to PLAY LAND, cast a spell, or PASS PRIORITY."
+        elif phase in {"PRECOMBAT_MAIN", "POSTCOMBAT_MAIN"} and holder == self.state.pid:
+            text = f"What to do: you have priority during {self.state.active_player}'s turn. Cast an instant, activate an ability, or PASS PRIORITY."
+        elif phase == "BEGIN_COMBAT" and holder == self.state.pid: text = "What to do: cast an instant, activate an ability, or PASS PRIORITY."
         else: text = "What to do: waiting for the server."
         self.action_hint.setText(text)
 
@@ -378,6 +386,8 @@ class MainWindow(QMainWindow):
         else:
             options = [opponent] if opponent else []
             options += [p.get("id") for pid in self.state.battlefield for p in self.state.battlefield.get(pid, []) if "creature" in (self.catalog.get_card_data(p.get("id", "")) or {}).get("card_type", "").casefold()]
+        if not options:
+            return []
         choice, ok = QInputDialog.getItem(self, "Select target", "Target:", options, 0, False)
         return [choice] if ok and choice else []
 
@@ -388,7 +398,11 @@ class MainWindow(QMainWindow):
         if "land" in data.get("card_type", "").casefold():
             self.log_text.setPlainText("Lands are played with PLAY LAND.")
             return
-        targets = self._select_target(card_id) if "target" in data.get("text", "").casefold() else []
+        requires_target = "target" in data.get("text", "").casefold()
+        targets = self._select_target(card_id) if requires_target else []
+        if requires_target and not targets:
+            self.log_text.setPlainText("A legal target is required.")
+            return
         mode = None
         payment = {"X" if key == "Generic" else key: value for key, value in data.get("mana_cost", {}).items() if value}
         if base in {"goblin_bushwhacker", "vines_of_vastwood"}:

@@ -9,7 +9,7 @@ def main():
     app = QApplication.instance() or QApplication([])
     catalog = CardCatalog(Path(__file__).resolve().parents[2] / "shared" / "card_catalog.json")
     manager = AssetManager(catalog)
-    manager.prefetch(catalog.catalog)
+    manager.prefetch(catalog.catalog, "full")
     print(f"scheduled {len(set(catalog.base_card_id(i) for i in catalog.catalog))} unique cards")
     return app.exec()
 

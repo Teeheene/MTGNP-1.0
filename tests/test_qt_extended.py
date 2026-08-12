@@ -3,6 +3,8 @@ from unittest.mock import MagicMock
 
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QPixmap
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
 
 from app.client.qt.dialogs import CardChoiceDialog
 from app.client.qt.main_window import CATALOG_PATH, MainWindow
@@ -125,7 +127,7 @@ class TestQtExtendedClient(unittest.TestCase):
         self.assertEqual(manager.request.call_args.args, ("forest_001", "full"))
         pixmap = QPixmap(20, 20)
         widget._on_image_ready("forest", "art", pixmap)
-        self.assertEqual(widget.art_label.text(), "No artwork cached")
+        self.assertEqual(widget.art_label.text(), "Artwork unavailable")
         widget._on_image_ready("forest", "full", pixmap)
         self.assertTrue(widget.art_label.pixmap() is not None)
         self.assertEqual(widget.art_label.text(), "")
@@ -139,7 +141,11 @@ class TestQtExtendedClient(unittest.TestCase):
         zone.set_cards(cards)
         self.assertEqual(zone.scroll.horizontalScrollBarPolicy().value, 0)
         self.assertEqual(zone.scroll.verticalScrollBarPolicy().value, 1)
-        self.assertEqual(len(zone.findChildren(type(zone.findChildren(CardWidget)[0]))), 7)
+        widgets = zone.findChildren(CardWidget)
+        self.assertEqual(len(widgets), 7)
+        self.assertTrue(all(widget.width() == 150 and widget.height() == 210 for widget in widgets))
+        self.assertGreater(zone.cards_host.sizeHint().width(), 7 * 150)
+        self.assertGreaterEqual(zone.cards_host.sizeHint().height(), 210)
         self.assertLessEqual(zone.sizeHint().width(), 7 * 150 + 100)
 
     def test_play_land_requires_active_player_and_land(self):
@@ -149,6 +155,70 @@ class TestQtExtendedClient(unittest.TestCase):
         self.window.hand_list.findChildren(CardWidget)[0].mousePressEvent(None) if False else None
         self.window.on_play_land_clicked()
         self.dispatcher.send_play_land.assert_not_called()
+
+        self.state.active_player = "alice"
+        self.window.refresh_ui()
+        card = self.window.hand_list.findChildren(CardWidget)[0]
+        card.setProperty("selected", True)
+        self.window.on_play_land_clicked()
+        self.dispatcher.send_play_land.assert_called_once_with("forest_013")
+
+    def test_play_land_rejects_second_land_and_non_land(self):
+        self.state.phase = "PRECOMBAT_MAIN"; self.state.active_player = "alice"; self.state.priority_holder = "alice"; self.state.priority_seq_num = 4
+        self.state.local_hand = ["forest_013"]
+        self.state.land_played_this_turn = True
+        self.window.refresh_ui()
+        self.assertFalse(self.window.play_land_btn.isEnabled())
+        card = self.window.hand_list.findChildren(CardWidget)[0]
+        card.setProperty("selected", True)
+        self.window.on_play_land_clicked()
+        self.dispatcher.send_play_land.assert_not_called()
+        self.assertIn("already played", self.window.log_text.toPlainText())
+
+        self.state.land_played_this_turn = False
+        self.window.hand_list.clear_selection()
+        self.state.local_hand = ["giant_growth_001"]
+        self.window.refresh_ui()
+        card = next(widget for widget in self.window.hand_list.findChildren(CardWidget)
+                    if widget.card.card_id == "giant_growth_001")
+        card.setProperty("selected", True)
+        self.window.on_play_land_clicked()
+        self.dispatcher.send_play_land.assert_not_called()
+        self.assertIn("not a land", self.window.log_text.toPlainText())
+
+    def test_targeted_spell_without_legal_target_is_not_sent(self):
+        self.state.phase = "PRECOMBAT_MAIN"; self.state.active_player = "alice"; self.state.priority_holder = "alice"; self.state.priority_seq_num = 4
+        self.state.local_hand = ["giant_growth_001"]
+        self.state.battlefield = {"alice": [], "bob": []}
+        self.window.refresh_ui()
+        card = self.window.hand_list.findChildren(CardWidget)[0]
+        card.setProperty("selected", True)
+        self.window.on_cast_spell_clicked()
+        self.dispatcher.send_cast_spell.assert_not_called()
+        self.assertEqual(self.window.log_text.toPlainText(), "A legal target is required.")
+
+    def test_guidance_is_active_player_aware(self):
+        self.state.phase = "PRECOMBAT_MAIN"; self.state.active_player = "bob"; self.state.priority_holder = "alice"
+        self.window.refresh_ui()
+        self.assertNotIn("PLAY LAND", self.window.action_hint.text())
+        self.state.phase = "DECLARE_ATTACKERS"
+        self.window.refresh_ui()
+        self.assertIn("waiting for bob", self.window.action_hint.text())
+        self.state.active_player = "alice"
+        self.window.refresh_ui()
+        self.assertIn("select your attacking creatures", self.window.action_hint.text())
+
+    def test_single_click_selects_double_click_inspects(self):
+        zone = ZoneWidget("Hand")
+        zone.set_cards([GamePresenter(self.state, CardCatalog(CATALOG_PATH)).card("forest_001")])
+        card = zone.findChildren(CardWidget)[0]
+        inspected = []
+        zone.inspect_requested.connect(inspected.append)
+        QTest.mouseClick(card, Qt.LeftButton)
+        self.assertEqual(zone.selected_card_ids(), ["forest_001"])
+        self.assertEqual(inspected, [])
+        QTest.mouseDClick(card, Qt.LeftButton)
+        self.assertEqual(inspected, ["forest_001"])
 
 if __name__ == "__main__":
     unittest.main()

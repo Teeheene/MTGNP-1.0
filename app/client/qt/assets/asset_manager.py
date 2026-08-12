@@ -1,8 +1,10 @@
 from pathlib import Path
 import json
+import ssl
 import threading
 from urllib.parse import quote
 from urllib.request import Request, urlopen
+import certifi
 
 from PySide6.QtCore import QObject, Signal, QStandardPaths, QUrl
 from PySide6.QtGui import QPixmap
@@ -29,6 +31,8 @@ class AssetManager(QObject):
         self.provider.resolved.connect(self._download)
         self.provider.failed.connect(self._failed_image)
         self._fallback_result.connect(self._on_fallback_result)
+        self.ssl_context = ssl.create_default_context(cafile=certifi.where())
+        print(f"[QT ASSET] Python CA bundle: {certifi.where()}")
 
     def key(self, card_id, variant="art"):
         return CardCatalog.base_card_id(card_id), variant
@@ -63,7 +67,7 @@ class AssetManager(QObject):
         reply.finished.connect(lambda: self._on_download(reply, base, variant))
 
     def _on_download(self, reply, base, variant):
-        key = (base, variant); self._pending.pop(key, None)
+        key = (base, variant)
         error = reply.errorString() if hasattr(reply, "errorString") else "unknown error"
         if reply.error():
             print(f"[QT ASSET] image download failed for {base}: {error}")
@@ -79,6 +83,7 @@ class AssetManager(QObject):
             except OSError: pass
             self.image_ready.emit(base, variant, pixmap)
             print(f"[QT ASSET] loaded {base} {variant}")
+            self._pending.pop(key, None)
         reply.deleteLater()
 
     def _failed_image(self, base, variant):
@@ -91,10 +96,12 @@ class AssetManager(QObject):
     def _fallback_worker(self, base, variant, name):
         try:
             headers = {"User-Agent": "MTGNP-DLSU/1.0", "Accept": "application/json"}
-            with urlopen(Request("https://api.scryfall.com/cards/named?exact=" + quote(name), headers=headers), timeout=10) as response:
+            with urlopen(Request("https://api.scryfall.com/cards/named?exact=" + quote(name), headers=headers), timeout=10, context=self.ssl_context) as response:
                 images = json.loads(response.read()).get("image_uris", {})
-            url = images.get("normal") or images.get("png") or images.get("large")
-            with urlopen(Request(url, headers={"User-Agent": "MTGNP-DLSU/1.0", "Accept": "image/*"}), timeout=15) as response:
+            url = images.get("normal") or images.get("png") or images.get("large") or images.get("small") or images.get("art_crop")
+            if not url:
+                raise ValueError("Scryfall response contained no image URL")
+            with urlopen(Request(url, headers={"User-Agent": "MTGNP-DLSU/1.0", "Accept": "image/*"}), timeout=15, context=self.ssl_context) as response:
                 payload = response.read()
             self._fallback_result.emit(base, variant, payload, "")
         except Exception as error:

@@ -1,6 +1,9 @@
 import tempfile
 import unittest
+import json
+import ssl
 from pathlib import Path
+from unittest.mock import patch
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QPixmap, QColor
@@ -66,3 +69,23 @@ class AssetTests(unittest.TestCase):
     def test_prefetch_deduplicates_physical_instances(self):
         self.manager.prefetch(["forest_001", "forest_002", "forest_003"])
         self.assertEqual(len(self.provider.calls), 1)
+
+    def test_verified_ca_context_used_for_metadata_and_image(self):
+        source = Path(self.tmp.name) / "source.png"
+        pix = QPixmap(10, 10); pix.fill(QColor("green")); pix.save(str(source))
+        responses = [
+            json.dumps({"image_uris": {"normal": "https://img.example/forest.png"}}).encode(),
+            source.read_bytes(),
+        ]
+        class Response:
+            def __init__(self, payload): self.payload = payload
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def read(self): return self.payload
+        with patch("app.client.qt.assets.asset_manager.urlopen", side_effect=[Response(item) for item in responses]) as mocked:
+            self.manager._fallback_worker("forest", "full", "Forest")
+        self.assertEqual(self.manager.ssl_context.verify_mode, ssl.CERT_REQUIRED)
+        self.assertIn("exact=Forest", mocked.call_args_list[0].args[0].full_url)
+        self.assertIs(mocked.call_args_list[0].kwargs["context"], self.manager.ssl_context)
+        self.assertIs(mocked.call_args_list[1].kwargs["context"], self.manager.ssl_context)
+        self.assertIn(("forest", "full"), self.manager.memory)

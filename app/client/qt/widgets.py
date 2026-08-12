@@ -20,25 +20,32 @@ class CardWidget(QFrame):
         self.setObjectName("CardWidget")
         self.setFixedSize(150, 210)
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 6, 8, 6)
+        self.card_layout = QVBoxLayout(self)
+        self.card_layout.setContentsMargins(6, 5, 6, 5)
         self.name_label = QLabel(card.name)
         self.name_label.setWordWrap(True)
+        self.name_label.setMaximumHeight(36)
         self.name_label.setStyleSheet("font-weight:700; color:#f5f1e8;")
-        layout.addWidget(self.name_label)
-        self.art_label = QLabel("No artwork cached")
+        self.card_layout.addWidget(self.name_label)
+        self.art_label = QLabel("Artwork unavailable")
         self.art_label.setAlignment(Qt.AlignCenter)
-        self.art_label.setMinimumHeight(72)
+        self.art_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.art_label.setStyleSheet("background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #34495e,stop:1 #17212b); color:#bdc7d3; border-radius:4px;")
-        layout.addWidget(self.art_label)
-        layout.addWidget(QLabel(card.mana_cost if isinstance(card.mana_cost, str) else str(card.mana_cost)))
-        type_label = QLabel(card.card_type)
-        type_label.setStyleSheet("color:#b9c0cc;")
-        layout.addWidget(type_label)
+        self.card_layout.addWidget(self.art_label, 1)
+        mana = card.mana_cost if isinstance(card.mana_cost, str) else str(card.mana_cost)
+        footer = f"{mana}  •  {card.card_type}"
         if card.power_toughness:
-            layout.addWidget(QLabel(card.power_toughness, alignment=Qt.AlignRight))
+            footer += f"  •  {card.power_toughness}"
+        self.footer_label = QLabel(footer)
+        self.footer_label.setWordWrap(True)
+        self.footer_label.setMaximumHeight(42)
+        self.footer_label.setStyleSheet("color:#d4dbe3; font-size:10px;")
+        self.card_layout.addWidget(self.footer_label)
+        self.tapped_label = None
         if card.tapped:
-            layout.addWidget(QLabel("TAPPED", alignment=Qt.AlignCenter))
+            self.tapped_label = QLabel("TAPPED", alignment=Qt.AlignCenter)
+            self.tapped_label.setStyleSheet("background:#725c24; color:white; font-weight:700;")
+            self.card_layout.addWidget(self.tapped_label)
         self.setStyleSheet("QFrame#CardWidget { background:#25313a; border:1px solid #596775; border-radius:8px; }")
         if asset_manager:
             asset_manager.image_ready.connect(self._on_image_ready)
@@ -46,7 +53,13 @@ class CardWidget(QFrame):
 
     def _on_image_ready(self, base_id, variant, pixmap):
         if base_id != self._asset_base or variant != self._asset_variant or self.card is None: return
-        self.art_label.setPixmap(pixmap.scaled(self.art_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        self.name_label.hide()
+        self.footer_label.hide()
+        if self.tapped_label:
+            self.tapped_label.hide()
+        self.card_layout.setContentsMargins(4, 4, 4, 4)
+        self.art_label.setFixedSize(140, 200)
+        self.art_label.setPixmap(pixmap.scaled(140, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         self.art_label.setText("")
 
     def mousePressEvent(self, event):
@@ -112,7 +125,7 @@ class ZoneWidget(QFrame):
         self.title.setStyleSheet("font-weight:700; color:#e3b56a;")
         self.layout.addWidget(self.title)
         self.cards_layout = QHBoxLayout()
-        self.cards_layout.setContentsMargins(0, 0, 0, 0)
+        self.cards_layout.setContentsMargins(8, 4, 8, 4)
         self.cards_layout.setSpacing(8)
         self.cards_layout.setSizeConstraint(QLayout.SetFixedSize)
         self.cards_host = QWidget()
