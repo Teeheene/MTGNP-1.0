@@ -87,9 +87,34 @@ class TestStitchBoardLayout(unittest.TestCase):
         ).y()
         self.assertLessEqual(hand_bottom, viewport.height())
         self.assertGreater(hand_bottom, 0)
+        action_buttons = (
+            self.window.pass_btn, self.window.play_land_btn,
+            self.window.cast_spell_btn, self.window.activate_btn,
+            self.window.attack_btn, self.window.block_btn,
+            self.window.order_btn, self.window.suspend_btn,
+            self.window.concede_btn,
+        )
+        for index, button in enumerate(action_buttons):
+            self.assertGreaterEqual(button.height(), button.minimumHeight())
+            for other in action_buttons[index + 1:]:
+                self.assertFalse(
+                    button.geometry().intersects(other.geometry()),
+                    f"{button.text()} overlaps {other.text()}",
+                )
+        self.assertFalse(self.window.stack_list.scroll.isVisible())
+        self.assertFalse(self.window.exile_list.scroll.isVisible())
         screenshot_path = os.environ.get("MTGNP_UI_SCREENSHOT_SMALL")
         if screenshot_path:
             self.assertTrue(self.window.grab().save(screenshot_path))
+
+    def test_stack_and_exile_rows_reappear_when_populated(self):
+        self._populate_board()
+        self.state.stack = [{"source": "lightning_bolt_001"}]
+        self.state.exile[self.state.pid] = ["forest_005"]
+        self.window.refresh_ui()
+        app.processEvents()
+        self.assertTrue(self.window.stack_list.scroll.isVisible())
+        self.assertTrue(self.window.exile_list.scroll.isVisible())
 
     def test_visible_mulligan_card_click_survives_refresh_and_keeps_physical_id(self):
         self.state.phase = "MULLIGAN"

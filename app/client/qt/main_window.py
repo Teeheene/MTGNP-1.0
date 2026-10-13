@@ -465,15 +465,24 @@ class MainWindow(QMainWindow):
         actions.setContentsMargins(6, 7, 6, 7)
         actions.setHorizontalSpacing(5)
         actions.setVerticalSpacing(5)
-        self.pass_btn = QPushButton("PASS PRIORITY"); self.pass_btn.clicked.connect(self.on_pass_clicked)
-        self.play_land_btn = QPushButton("PLAY LAND"); self.play_land_btn.clicked.connect(self.on_play_land_clicked)
+        self.pass_btn = QPushButton("PASS"); self.pass_btn.clicked.connect(self.on_pass_clicked)
+        self.pass_btn.setToolTip("Pass priority")
+        self.play_land_btn = QPushButton("LAND"); self.play_land_btn.clicked.connect(self.on_play_land_clicked)
+        self.play_land_btn.setToolTip("Play a land")
         self.cast_spell_btn = QPushButton("CAST SPELL"); self.cast_spell_btn.setObjectName("Primary"); self.cast_spell_btn.clicked.connect(self.on_cast_spell_clicked)
+        self.cast_spell_btn.setToolTip("Cast a spell")
         self.activate_btn = QPushButton("ACTIVATE"); self.activate_btn.clicked.connect(self.on_activate_clicked)
-        self.attack_btn = QPushButton("CONFIRM ATTACKERS"); self.attack_btn.clicked.connect(self.on_attack_clicked)
-        self.block_btn = QPushButton("CONFIRM BLOCKERS"); self.block_btn.clicked.connect(self.on_block_clicked)
-        self.order_btn = QPushButton("CONFIRM ORDER"); self.order_btn.clicked.connect(self.on_damage_order_clicked)
+        self.activate_btn.setToolTip("Activate an ability")
+        self.attack_btn = QPushButton("ATTACK"); self.attack_btn.clicked.connect(self.on_attack_clicked)
+        self.attack_btn.setToolTip("Confirm attackers")
+        self.block_btn = QPushButton("BLOCK"); self.block_btn.clicked.connect(self.on_block_clicked)
+        self.block_btn.setToolTip("Confirm blockers")
+        self.order_btn = QPushButton("ORDER"); self.order_btn.clicked.connect(self.on_damage_order_clicked)
+        self.order_btn.setToolTip("Confirm damage order")
         self.suspend_btn = QPushButton("SUSPEND"); self.suspend_btn.clicked.connect(self.on_suspend_clicked)
+        self.suspend_btn.setToolTip("Suspend a card")
         self.concede_btn = QPushButton("CONCEDE"); self.concede_btn.setObjectName("Danger"); self.concede_btn.clicked.connect(lambda: self.dispatcher.send_concede())
+        self.concede_btn.setToolTip("Concede the game")
         buttons = (
             self.pass_btn, self.play_land_btn, self.cast_spell_btn,
             self.activate_btn, self.attack_btn, self.block_btn,
@@ -622,8 +631,14 @@ class MainWindow(QMainWindow):
         self.hand_list.set_cards([self.presenter.card(card_id) for card_id in self.state.local_hand])
         self.your_battlefield_list.set_cards([self.presenter.card(card.get("id", str(card)), tapped=bool(card.get("tapped"))) for card in self.state.battlefield.get(self.state.pid, [])])
         self.opp_battlefield_list.set_cards([self.presenter.card(card.get("id", str(card)), selectable=False) for card in self.state.battlefield.get(opponent, [])])
-        self.stack_list.set_cards([self.presenter.card(item.get("source", "Ability")) for item in self.state.stack])
-        self.exile_list.set_cards([self.presenter.card(card_id) for card_id in self.state.exile.get(self.state.pid, [])])
+        stack_cards = [self.presenter.card(item.get("source", "Ability")) for item in self.state.stack]
+        exile_cards = [self.presenter.card(card_id) for card_id in self.state.exile.get(self.state.pid, [])]
+        self.stack_list.set_cards(stack_cards)
+        self.exile_list.set_cards(exile_cards)
+        # Empty public zones need only their heading; reclaiming the blank card
+        # row keeps the action dock from compressing at compact window heights.
+        self.stack_list.scroll.setVisible(bool(stack_cards))
+        self.exile_list.scroll.setVisible(bool(exile_cards))
 
     def _refresh_visuals(self, phase, turn, holder, opponent):
         """Update the labels in the Stitch board without touching gameplay selection."""
