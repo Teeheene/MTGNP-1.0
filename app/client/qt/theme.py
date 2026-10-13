@@ -57,3 +57,58 @@ QComboBox::drop-down { border:0; width:20px; }
 QDialog { background:#121a1e; color:#f0ede6; }
 QToolTip { background:#25342e; color:#f2efe8; border:1px solid #82916b; padding:5px; }
 """
+
+# Aetheric Grimoire / Google Stitch visual layer. Keep the shared rules above
+# for non-board controls while replacing the former teal/orange game palette.
+STITCH_THEME += """
+QMainWindow, QWidget#AppRoot, QStackedWidget { background:#16130b; color:#eae1d4; }
+QWidget { color:#eae1d4; }
+QLabel#Brand { color:#f2ca50; font-family:Georgia; font-size:29px; }
+QLabel#BrandAccent { color:#b7a782; font-size:10px; }
+QLabel#HeaderActive { color:#f2ca50; background:#292418; border-bottom:3px solid #f2ca50; padding:13px 14px; font-family:Georgia; font-size:17px; font-weight:700; }
+QLabel#Eyebrow { color:#d4af37; }
+QLabel#PageTitle { color:#f5e8c8; font-family:Georgia; }
+QLabel#Caption { color:#b9ac96; }
+QLabel#Status { color:#f2ca50; }
+QLabel#Life { color:#e9d9ad; }
+QLabel#ZoneTitle { color:#dfc784; }
+QLabel#PlayerName { color:#f0dfb5; font-family:Georgia; }
+QLabel#Health { color:#f3b6a7; font-size:16px; }
+QLabel#PhaseCurrent { color:#f2ca50; }
+QLabel#PhaseIdle { color:#ac9f86; }
+QLabel#SectionTitle { color:#ecd9ac; font-family:Georgia; font-size:16px; }
+QLabel#Instruction { color:#e4cb8c; }
+QLabel#Notice { color:#f2b784; }
+QLabel#AvatarGreen { background:#222717; color:#d8de9a; border-color:#ab9141; border-radius:20px; }
+QLabel#AvatarRed { background:#36251e; color:#f3be98; border-color:#a67c4b; border-radius:20px; }
+QLabel#ArchmagePortrait { color:#f5d775; font-family:Georgia; font-size:50px; background:qradialgradient(cx:0.5,cy:0.4,radius:0.8,fx:0.5,fy:0.4,stop:0 #3e443e,stop:0.5 #282d2e,stop:1 #151712); border:2px solid #d4af37; border-radius:12px; }
+QLabel#RailPlayerName { color:#f2ca50; font-family:Georgia; font-size:17px; font-weight:700; }
+QLabel#RailRank { color:#a99d83; font-size:10px; font-weight:700; }
+QFrame#Header { background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #262218,stop:1 #1c1a14); border-bottom:1px solid #4d4635; }
+QFrame#Panel, QFrame#Sidebar, QGroupBox { background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #2b271e,stop:1 #1b1913); border:1px solid #433a2a; }
+QFrame#Playmat { background:qradialgradient(cx:0.51,cy:0.44,radius:0.87,fx:0.51,fy:0.44,stop:0 #766744,stop:0.55 #50442e,stop:1 #2e281e); border:1px solid #6b5c3d; border-radius:5px; }
+QFrame#HeroArt { background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #15140e,stop:0.4 #33301e,stop:0.74 #4f3d21,stop:1 #19160f); border-color:#6d5935; }
+QFrame#PlayerPlate { background:rgba(20,18,13,0.72); border:1px solid #4b402d; }
+QFrame#BattlefieldDivider { background:rgba(16,15,10,0.40); border:0px; border-top:1px solid #8b743b; border-bottom:1px solid #8b743b; }
+QFrame#ArcaneRail { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #1e1b12,stop:1 #130f0a); border:0px; border-right:1px solid #514630; }
+QFrame#ActionDock { background:#1b1812; border-color:#463d2d; }
+QScrollArea#CardScroll { background:rgba(19,16,11,0.12); border:1px solid rgba(190,164,101,0.26); }
+QScrollBar:horizontal, QScrollBar:vertical { background:#17150f; }
+QScrollBar::handle:horizontal, QScrollBar::handle:vertical { background:#817048; }
+QPushButton { background:#332d22; color:#eae1d4; border-color:#695d43; }
+QPushButton:hover { background:#4c412c; border-color:#bb9e54; }
+QPushButton:pressed { background:#655231; }
+QPushButton:disabled { background:#211f1a; color:#817867; border-color:#39352b; }
+QPushButton#Primary { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #ffe076,stop:1 #d4af37); border-color:#f2ca50; color:#352b0a; font-family:Georgia; font-size:14px; font-weight:700; }
+QPushButton#Primary:hover { background:#ffe691; border-color:#fff0b0; }
+QPushButton#Keep { background:#33452b; border-color:#7d9861; color:#f1f8df; }
+QPushButton#Keep:hover { background:#49613b; }
+QPushButton#Danger { background:#532b25; border-color:#97554a; color:#fae1d9; }
+QPushButton#Danger:hover { background:#743831; }
+QPushButton#Primary:disabled, QPushButton#Keep:disabled, QPushButton#Danger:disabled { background:#211f1a; color:#817867; border-color:#39352b; }
+QGroupBox::title { color:#eccb78; }
+QListWidget, QTextEdit, QLineEdit, QComboBox { background:#17150f; border-color:#5a5038; selection-background-color:#806c37; selection-color:#ffebbf; }
+QLineEdit:focus, QComboBox:focus, QListWidget:focus { border-color:#f2ca50; }
+QDialog { background:#211d15; color:#eae1d4; }
+QToolTip { background:#3b3426; color:#f5e6bb; border-color:#b49750; }
+"""

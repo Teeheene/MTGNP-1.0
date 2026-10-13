@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFontDatabase
 from PySide6.QtWidgets import (
     QComboBox, QFormLayout, QFrame, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QListWidget,
     QMainWindow, QPushButton, QScrollArea, QStackedWidget, QTextEdit,
@@ -27,6 +28,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self, state, dispatcher: PduDispatcher, parent=None):
         super().__init__(parent)
+        self._ensure_rendering_fonts()
         self.state = state
         self.dispatcher = dispatcher
         self.catalog = CardCatalog(CATALOG_PATH)
@@ -48,6 +50,20 @@ class MainWindow(QMainWindow):
         self.state_updated_signal.connect(self.refresh_ui)
         self.refresh_ui()
 
+    @staticmethod
+    def _ensure_rendering_fonts():
+        """Recover legible text when headless Qt exposes no system fonts.
+
+        Normal desktops already have font families; no fonts are bundled or
+        installed, and the fallback is skipped on those systems.
+        """
+        if QFontDatabase.families():
+            return
+        for filename in ("segoeui.ttf", "georgia.ttf", "arial.ttf"):
+            font_path = Path("C:/Windows/Fonts") / filename
+            if font_path.is_file():
+                QFontDatabase.addApplicationFont(str(font_path))
+
     def _build_ui(self):
         root = QWidget()
         root.setObjectName("AppRoot")
@@ -57,22 +73,28 @@ class MainWindow(QMainWindow):
         outer.setSpacing(0)
         header = QFrame()
         header.setObjectName("Header")
-        header.setFixedHeight(81)
+        header.setFixedHeight(76)
         header_row = QHBoxLayout(header)
-        header_row.setContentsMargins(24, 10, 24, 10)
-        emblem = QLabel("✦")
-        emblem.setStyleSheet("color:#ed7c32; font-size:40px; font-weight:700;")
+        header_row.setContentsMargins(28, 8, 28, 8)
+        emblem = QLabel("A")
+        emblem.setAlignment(Qt.AlignCenter)
+        emblem.setFixedSize(46, 46)
+        emblem.setStyleSheet("color:#f2ca50; font-family:Georgia; font-size:29px; font-weight:700; background:#332b1c; border:1px solid #a48a48; border-radius:12px;")
         header_row.addWidget(emblem)
         brand_column = QVBoxLayout()
         brand_column.setSpacing(0)
-        brand = QLabel("MTGNP")
+        brand = QLabel("Aetherium Codex")
         brand.setObjectName("Brand")
         brand_column.addWidget(brand)
-        version = QLabel("1.0  •  NETWORK DUEL")
+        version = QLabel("MTGNP 1.0  ·  NETWORK DUEL")
         version.setObjectName("BrandAccent")
         brand_column.addWidget(version)
         header_row.addLayout(brand_column)
         header_row.addStretch(1)
+        active_view = QLabel("BATTLEFIELD")
+        active_view.setObjectName("HeaderActive")
+        header_row.addWidget(active_view)
+        header_row.addSpacing(28)
         status_column = QVBoxLayout()
         status_column.setSpacing(5)
         self.status_label = QLabel("Phase: LOBBY | Turn: 0")
@@ -284,15 +306,27 @@ class MainWindow(QMainWindow):
         board.setSpacing(10)
 
         rail = QFrame()
-        rail.setObjectName("PhaseRail")
-        rail.setFixedWidth(156)
+        rail.setObjectName("ArcaneRail")
+        rail.setFixedWidth(224)
         phase_layout = QVBoxLayout(rail)
-        phase_layout.setContentsMargins(12, 13, 12, 12)
-        phase_layout.setSpacing(4)
+        phase_layout.setContentsMargins(14, 16, 14, 12)
+        phase_layout.setSpacing(5)
+        portrait = QLabel("A")
+        portrait.setObjectName("ArchmagePortrait")
+        portrait.setFixedSize(88, 88)
+        portrait.setAlignment(Qt.AlignCenter)
+        phase_layout.addWidget(portrait, alignment=Qt.AlignHCenter)
+        self.rail_player_name = self._label(self.state.pid, "RailPlayerName")
+        self.rail_player_name.setAlignment(Qt.AlignCenter)
+        phase_layout.addWidget(self.rail_player_name)
+        rank = self._label("PLANESWALKER  ·  CONNECTED", "RailRank")
+        rank.setAlignment(Qt.AlignCenter)
+        phase_layout.addWidget(rank)
+        phase_layout.addSpacing(10)
         phase_layout.addWidget(self._label("TURN SEQUENCE", "Eyebrow"))
         self.phase_turn_label = self._label("Turn 1", "SectionTitle")
         phase_layout.addWidget(self.phase_turn_label)
-        phase_layout.addSpacing(9)
+        phase_layout.addSpacing(4)
         phases = (
             ("UNTAP", "Untap"), ("UPKEEP", "Upkeep"), ("DRAW", "Draw"),
             ("PRECOMBAT_MAIN", "Main (1)"), ("BEGIN_COMBAT", "Begin Combat"),
@@ -304,24 +338,29 @@ class MainWindow(QMainWindow):
         self.phase_items = {}
         for code, title in phases:
             label = self._label("  " + title, "PhaseIdle")
-            label.setMinimumHeight(21)
+            label.setMinimumHeight(19)
             self.phase_items[code] = label
             phase_layout.addWidget(label)
         phase_layout.addStretch(1)
-        phase_layout.addWidget(self._label("●  LIVE GAME", "Eyebrow"))
+        self.side_cast_btn = QPushButton("CAST SPELL")
+        self.side_cast_btn.setObjectName("Primary")
+        self.side_cast_btn.setMinimumHeight(45)
+        self.side_cast_btn.clicked.connect(self.on_cast_spell_clicked)
+        phase_layout.addWidget(self.side_cast_btn)
+        phase_layout.addWidget(self._label("●  LIVE NETWORK DUEL", "RailRank"))
         board.addWidget(rail)
 
         playmat = QFrame()
         playmat.setObjectName("Playmat")
         mat_layout = QVBoxLayout(playmat)
-        mat_layout.setContentsMargins(11, 8, 11, 8)
-        mat_layout.setSpacing(3)
+        mat_layout.setContentsMargins(18, 10, 18, 10)
+        mat_layout.setSpacing(7)
         opponent_plate = QFrame()
         opponent_plate.setObjectName("PlayerPlate")
         opponent_row = QHBoxLayout(opponent_plate)
-        opponent_row.setContentsMargins(9, 4, 9, 4)
+        opponent_row.setContentsMargins(12, 4, 12, 4)
         opponent_avatar = self._label("OP", "AvatarRed")
-        opponent_avatar.setFixedSize(44, 44)
+        opponent_avatar.setFixedSize(40, 40)
         opponent_avatar.setAlignment(Qt.AlignCenter)
         opponent_row.addWidget(opponent_avatar)
         opponent_labels = QVBoxLayout()
@@ -341,10 +380,10 @@ class MainWindow(QMainWindow):
         )
         mat_layout.addWidget(self.opp_battlefield_list)
         divider = QFrame()
-        divider.setObjectName("HighlightBar")
+        divider.setObjectName("BattlefieldDivider")
         divider_layout = QHBoxLayout(divider)
         divider_layout.setContentsMargins(12, 5, 12, 5)
-        divider_layout.addWidget(self._label("⚔  BATTLEFIELD", "Eyebrow"))
+        divider_layout.addWidget(self._label("THE BATTLEFIELD", "Eyebrow"))
         divider_layout.addStretch()
         self.battlefield_phase = self._label("YOUR MAIN PHASE", "PhaseCurrent")
         divider_layout.addWidget(self.battlefield_phase)
@@ -357,9 +396,9 @@ class MainWindow(QMainWindow):
         your_plate = QFrame()
         your_plate.setObjectName("PlayerPlate")
         your_row = QHBoxLayout(your_plate)
-        your_row.setContentsMargins(9, 4, 9, 4)
+        your_row.setContentsMargins(12, 4, 12, 4)
         your_avatar = self._label("YOU", "AvatarGreen")
-        your_avatar.setFixedSize(44, 44)
+        your_avatar.setFixedSize(40, 40)
         your_avatar.setAlignment(Qt.AlignCenter)
         your_row.addWidget(your_avatar)
         your_labels = QVBoxLayout()
@@ -381,9 +420,9 @@ class MainWindow(QMainWindow):
 
         sidebar = QFrame()
         sidebar.setObjectName("Sidebar")
-        sidebar.setFixedWidth(282)
+        sidebar.setFixedWidth(246)
         right = QVBoxLayout(sidebar)
-        right.setContentsMargins(12, 10, 12, 10)
+        right.setContentsMargins(10, 11, 10, 10)
         right.setSpacing(6)
         right.addWidget(self._label("THE STACK", "SectionTitle"))
         self.stack_list = ZoneWidget(
@@ -581,7 +620,7 @@ class MainWindow(QMainWindow):
         for code, label in self.phase_items.items():
             active = code == phase
             label.setObjectName("PhaseCurrent" if active else "PhaseIdle")
-            label.setText(("▸ " if active else "  ") + label.text().lstrip("▸ "))
+            label.setText(("> " if active else "  ") + label.text().lstrip("> "))
             label.style().unpolish(label)
             label.style().polish(label)
         self.battlefield_phase.setText(phase.replace("_", " ").title())
@@ -589,6 +628,7 @@ class MainWindow(QMainWindow):
         self.game_info_priority.setText(f"Priority: {'You' if holder == self.state.pid else holder or 'None'}")
         self.opponent_info.setText(opponent)
         self.your_info.setText(self.state.pid)
+        self.rail_player_name.setText(self.state.pid)
         self.opponent_health.setText(f"♥ {self.state.life_totals.get(opponent, 20)}")
         self.your_health.setText(f"♥ {self.state.life_totals.get(self.state.pid, 20)}")
         self.opponent_meta.setText(
@@ -614,7 +654,7 @@ class MainWindow(QMainWindow):
     def _refresh_actions(self, phase):
         usable = self.state.priority_holder == self.state.pid and self.state.priority_seq_num is not None
         self.pass_btn.setEnabled(usable or phase == "LOBBY"); self.play_land_btn.setEnabled(usable and phase in {"PRECOMBAT_MAIN", "POSTCOMBAT_MAIN"} and self.state.active_player == self.state.pid and not self.state.land_played_this_turn)
-        self.cast_spell_btn.setEnabled(usable); self.activate_btn.setEnabled(usable)
+        self.cast_spell_btn.setEnabled(usable); self.side_cast_btn.setEnabled(usable); self.activate_btn.setEnabled(usable)
         self.attack_btn.setEnabled(phase == "DECLARE_ATTACKERS" and self.state.active_player == self.state.pid)
         self.block_btn.setEnabled(phase == "DECLARE_BLOCKERS" and self.state.active_player != self.state.pid)
         self.order_btn.setEnabled(phase == "ASSIGN_DAMAGE_ORDER" and bool(self.state.pending_damage_orders))

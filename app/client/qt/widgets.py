@@ -8,9 +8,9 @@ class CardWidget(QFrame):
     clicked = Signal(str)
     inspect_requested = Signal(str)
 
-    NORMAL = "QFrame#CardWidget { background:#202b2c; border:1px solid #526459; border-radius:6px; }"
-    SELECTED = "QFrame#CardWidget { background:#26452b; border:3px solid #86ce62; border-radius:6px; }"
-    HOVERED = "QFrame#CardWidget { background:#263b40; border:2px solid #e8aa55; border-radius:6px; }"
+    NORMAL = "QFrame#CardWidget { background:#211d17; border:1px solid #958052; border-radius:7px; }"
+    SELECTED = "QFrame#CardWidget { background:#34301c; border:3px solid #f2ca50; border-radius:7px; }"
+    HOVERED = "QFrame#CardWidget { background:#403520; border:2px solid #e9c349; border-radius:7px; }"
 
     def __init__(self, card, parent=None, asset_manager=None, variant="full", card_size=(150, 210)):
         super().__init__(parent)
@@ -29,12 +29,12 @@ class CardWidget(QFrame):
         self.name_label = QLabel(card.name)
         self.name_label.setWordWrap(True)
         self.name_label.setMaximumHeight(36)
-        self.name_label.setStyleSheet("font-weight:700; color:#f5f1e8;")
+        self.name_label.setStyleSheet("font-weight:700; color:#f6e5b5; font-family:Georgia;")
         self.card_layout.addWidget(self.name_label)
         self.art_label = QLabel("Artwork unavailable")
         self.art_label.setAlignment(Qt.AlignCenter)
         self.art_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.art_label.setStyleSheet("background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #34495e,stop:1 #17212b); color:#bdc7d3; border-radius:4px;")
+        self.art_label.setStyleSheet("background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #4a3e2b,stop:1 #1b1a16); color:#c7bda5; border-radius:4px;")
         self.card_layout.addWidget(self.art_label, 1)
         mana = card.mana_cost if isinstance(card.mana_cost, str) else str(card.mana_cost)
         footer = f"{mana}  •  {card.card_type}"
@@ -43,7 +43,7 @@ class CardWidget(QFrame):
         self.footer_label = QLabel(footer)
         self.footer_label.setWordWrap(True)
         self.footer_label.setMaximumHeight(42)
-        self.footer_label.setStyleSheet("color:#d4dbe3; font-size:10px;")
+        self.footer_label.setStyleSheet("color:#d1c6ad; font-size:10px;")
         self.card_layout.addWidget(self.footer_label)
         self.tapped_label = None
         if card.tapped:

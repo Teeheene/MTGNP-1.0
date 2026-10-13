@@ -56,6 +56,9 @@ class TestStitchBoardLayout(unittest.TestCase):
                                  central.height(), zone.title.text())
         self.assertTrue(self.window.pass_btn.isVisible())
         self.assertTrue(self.window.concede_btn.isVisible())
+        self.assertTrue(self.window.side_cast_btn.isVisible())
+        self.assertEqual(self.window.side_cast_btn.text(), "CAST SPELL")
+        self.assertEqual(self.window.phase_items["PRECOMBAT_MAIN"].text(), "> Main (1)")
         self.assertEqual(self.window.hand_list.count(), 6)
         self.assertEqual(self.window.your_battlefield_list.count(), 4)
         self.assertTrue(all(card.width() == 100 for card in
@@ -74,6 +77,9 @@ class TestStitchBoardLayout(unittest.TestCase):
                      self.window.opp_battlefield_list):
             self.assertLessEqual(zone.geometry().bottom(),
                                  zone.parentWidget().height(), zone.title.text())
+        screenshot_path = os.environ.get("MTGNP_UI_SCREENSHOT_SMALL")
+        if screenshot_path:
+            self.assertTrue(self.window.grab().save(screenshot_path))
 
     def test_visible_mulligan_card_click_survives_refresh_and_keeps_physical_id(self):
         self.state.phase = "MULLIGAN"
