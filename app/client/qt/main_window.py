@@ -2,7 +2,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QListWidget,
+    QComboBox, QFormLayout, QFrame, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QListWidget,
     QMainWindow, QPushButton, QScrollArea, QStackedWidget, QTextEdit,
     QLineEdit, QInputDialog, QMessageBox, QVBoxLayout, QWidget,
 )
@@ -14,6 +14,8 @@ from app.client.deck_builder import DEFAULT_DECKS
 from app.shared.card_catalog import CardCatalog
 from app.client.qt.assets import AssetManager
 from app.client.qt.widgets import ZoneWidget, CardInspector
+from app.client.qt.widgets import CardWidget
+from app.client.qt.theme import STITCH_THEME
 
 CATALOG_PATH = Path(__file__).resolve().parents[2] / "shared" / "card_catalog.json"
 
@@ -40,105 +42,379 @@ class MainWindow(QMainWindow):
         self._last_phase = None
         self._ready_sent = False
         self.setWindowTitle(f"MTGNP 1.0 Client — Player: {state.pid}")
-        self.resize(1366, 820)
+        self.resize(1510, 900)
+        self.setMinimumSize(1120, 730)
         self._build_ui()
         self.state_updated_signal.connect(self.refresh_ui)
         self.refresh_ui()
 
     def _build_ui(self):
         root = QWidget()
+        root.setObjectName("AppRoot")
         self.setCentralWidget(root)
         outer = QVBoxLayout(root)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        header = QFrame()
+        header.setObjectName("Header")
+        header.setFixedHeight(81)
+        header_row = QHBoxLayout(header)
+        header_row.setContentsMargins(24, 10, 24, 10)
+        emblem = QLabel("✦")
+        emblem.setStyleSheet("color:#ed7c32; font-size:40px; font-weight:700;")
+        header_row.addWidget(emblem)
+        brand_column = QVBoxLayout()
+        brand_column.setSpacing(0)
+        brand = QLabel("MTGNP")
+        brand.setObjectName("Brand")
+        brand_column.addWidget(brand)
+        version = QLabel("1.0  •  NETWORK DUEL")
+        version.setObjectName("BrandAccent")
+        brand_column.addWidget(version)
+        header_row.addLayout(brand_column)
+        header_row.addStretch(1)
+        status_column = QVBoxLayout()
+        status_column.setSpacing(5)
         self.status_label = QLabel("Phase: LOBBY | Turn: 0")
         self.life_label = QLabel("Life Totals — You: 20 | Opponent: 20")
         self.status_label.setObjectName("Status")
         self.life_label.setObjectName("Life")
-        outer.addWidget(self.status_label)
-        outer.addWidget(self.life_label)
+        self.status_label.setAlignment(Qt.AlignRight)
+        self.life_label.setAlignment(Qt.AlignRight)
+        status_column.addWidget(self.status_label)
+        status_column.addWidget(self.life_label)
+        header_row.addLayout(status_column)
+        outer.addWidget(header)
         self.pages = QStackedWidget()
         outer.addWidget(self.pages, 1)
         self._build_connection_page()
         self._build_lobby_page()
         self._build_mulligan_page()
         self._build_game_page()
-        self.setStyleSheet("""
-            QWidget { background:#10161d; color:#edf2f7; font-size:13px; }
-            QGroupBox { border:1px solid #354352; border-radius:8px; margin-top:8px; padding:10px; }
-            QGroupBox::title { subcontrol-origin:margin; left:10px; color:#e4b56a; }
-            QPushButton { background:#273646; border:1px solid #506276; border-radius:6px; padding:9px 14px; }
-            QPushButton:hover { background:#35506a; }
-            QPushButton:disabled { background:#161d24; color:#65717d; border:1px solid #28323c; }
-            QPushButton:disabled:hover { background:#161d24; color:#65717d; border:1px solid #28323c; }
-            QPushButton#Primary { background:#b66a27; border-color:#e4a45c; font-weight:700; }
-            QPushButton#Danger { background:#79343d; }
-            QListWidget, QTextEdit, QLineEdit, QComboBox { background:#18232d; border:1px solid #354352; border-radius:5px; padding:5px; }
-            QLabel#Status { color:#e4b56a; font-size:16px; font-weight:700; }
-            QLabel#Life { color:#9fd6a6; font-weight:700; }
-        """)
+        self.setStyleSheet(STITCH_THEME)
 
     def _build_connection_page(self):
-        page = QWidget(); layout = QVBoxLayout(page)
-        box = QGroupBox("1. LAUNCH / CONNECT"); form = QFormLayout(box)
+        page = QWidget()
+        layout = QHBoxLayout(page)
+        layout.setContentsMargins(34, 32, 34, 32)
+        layout.setSpacing(24)
+        hero = QFrame()
+        hero.setObjectName("HeroArt")
+        hero_layout = QVBoxLayout(hero)
+        hero_layout.setContentsMargins(42, 42, 42, 40)
+        hero_layout.addWidget(self._label("WELCOME TO THE BATTLEFIELD", "Eyebrow"))
+        hero_layout.addStretch(2)
+        insignia = QLabel("♛")
+        insignia.setStyleSheet("font-size:100px; color:#d48e4b;")
+        insignia.setAlignment(Qt.AlignCenter)
+        hero_layout.addWidget(insignia)
+        hero_title = QLabel("MAGIC  •  THE GATHERING")
+        hero_title.setStyleSheet("font-family:Georgia; font-size:31px; font-weight:700; color:#fff0d6;")
+        hero_title.setAlignment(Qt.AlignCenter)
+        hero_layout.addWidget(hero_title)
+        hero_layout.addWidget(self._label("A two-player, turn-based duel of spells and strategy.", "Caption"), alignment=Qt.AlignCenter)
+        hero_layout.addStretch(3)
+        hero_layout.addWidget(self._label("MTGNP 1.0   /   ONLINE DUEL", "Eyebrow"))
+        layout.addWidget(hero, 3)
+        panel = QFrame()
+        panel.setObjectName("Panel")
+        panel_layout = QVBoxLayout(panel)
+        panel_layout.setContentsMargins(28, 30, 28, 30)
+        panel_layout.setSpacing(18)
+        panel_layout.addWidget(self._label("01  /  LAUNCH & CONNECT", "Eyebrow"))
+        panel_layout.addWidget(self._label("Enter the arena", "PageTitle"))
+        panel_layout.addWidget(self._label("Choose your deck and connect to a game server.", "Caption"))
+        box = QGroupBox("CONNECTION DETAILS")
+        form = QFormLayout(box)
+        form.setSpacing(14)
         self.host_edit = QLineEdit("127.0.0.1"); self.port_edit = QLineEdit("4444")
         self.name_edit = QLineEdit(self.state.pid)
         self.deck_combo = QComboBox()
         self.deck_combo.addItems([f"{name} Deck" for name in DEFAULT_DECKS])
-        form.addRow("Server host", self.host_edit); form.addRow("Port", self.port_edit)
-        form.addRow("Player name", self.name_edit); form.addRow("Deck", self.deck_combo)
-        layout.addWidget(box)
-        self.connect_btn = QPushButton("CONNECT"); self.connect_btn.setObjectName("Primary")
-        self.connect_btn.clicked.connect(self.connect_to_server); layout.addWidget(self.connect_btn)
-        self.connection_error = QLabel(""); layout.addWidget(self.connection_error); layout.addStretch()
+        form.addRow("Server Address", self.host_edit); form.addRow("Port", self.port_edit)
+        form.addRow("Player Name", self.name_edit); form.addRow("Deck", self.deck_combo)
+        panel_layout.addWidget(box)
+        self.connect_btn = QPushButton("CONNECT TO SERVER  →")
+        self.connect_btn.setObjectName("Primary")
+        self.connect_btn.setMinimumHeight(48)
+        self.connect_btn.clicked.connect(self.connect_to_server)
+        panel_layout.addWidget(self.connect_btn)
+        self.connection_error = QLabel("")
+        self.connection_error.setObjectName("Notice")
+        self.connection_error.setWordWrap(True)
+        panel_layout.addWidget(self.connection_error)
+        panel_layout.addStretch(1)
+        panel_layout.addWidget(self._label("TCP / IPv4  •  DEFAULT PORT 4444", "Caption"))
+        layout.addWidget(panel, 2)
         self.pages.addWidget(page)
 
     def _build_lobby_page(self):
-        page = QWidget(); layout = QVBoxLayout(page)
-        self.lobby_title = QLabel("2. LOBBY"); layout.addWidget(self.lobby_title)
-        self.lobby_status = QLabel("Waiting for opponent..."); layout.addWidget(self.lobby_status)
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(42, 30, 42, 30)
+        layout.setSpacing(15)
+        layout.addWidget(self._label("02  /  LOBBY", "Eyebrow"))
+        self.lobby_title = self._label("Prepare for battle", "PageTitle")
+        layout.addWidget(self.lobby_title)
+        self.lobby_status = self._label("Waiting for opponent...", "Instruction")
+        layout.addWidget(self.lobby_status)
+        panel = QFrame()
+        panel.setObjectName("Panel")
+        panel_layout = QVBoxLayout(panel)
+        panel_layout.setContentsMargins(20, 22, 20, 22)
+        panel_layout.setSpacing(18)
+        panel_layout.addWidget(self._label("Connected to game server  •  2 PLAYER MATCH", "Eyebrow"))
         row = QHBoxLayout()
-        self.ready_btn = QPushButton("READY"); self.ready_btn.setObjectName("Primary"); self.ready_btn.clicked.connect(self.send_ready)
-        self.leave_btn = QPushButton("LEAVE LOBBY"); self.leave_btn.setObjectName("Danger"); self.leave_btn.clicked.connect(self.close_connection)
-        row.addWidget(self.ready_btn); row.addWidget(self.leave_btn); layout.addLayout(row); layout.addStretch()
+        row.setSpacing(18)
+        local_plate, self.local_lobby_name, self.local_lobby_state = self._lobby_player_panel("YOU", True)
+        opponent_plate, self.opponent_lobby_name, self.opponent_lobby_state = self._lobby_player_panel("OPPONENT", False)
+        row.addWidget(local_plate)
+        row.addWidget(opponent_plate)
+        panel_layout.addLayout(row)
+        panel_layout.addWidget(self._label("Both players must signal READY to begin the opening hand.", "Caption"))
+        layout.addWidget(panel, 1)
+        buttons = QHBoxLayout()
+        buttons.addStretch(1)
+        self.ready_btn = QPushButton("●  READY")
+        self.ready_btn.setObjectName("Keep")
+        self.ready_btn.setMinimumWidth(175)
+        self.ready_btn.clicked.connect(self.send_ready)
+        self.leave_btn = QPushButton("LEAVE LOBBY")
+        self.leave_btn.setObjectName("Danger")
+        self.leave_btn.clicked.connect(self.close_connection)
+        buttons.addWidget(self.ready_btn)
+        buttons.addWidget(self.leave_btn)
+        layout.addLayout(buttons)
         self.pages.addWidget(page)
 
     def _build_mulligan_page(self):
         page = QWidget(); layout = QVBoxLayout(page)
-        layout.addWidget(QLabel("3. MULLIGAN DECISION"))
+        layout.setContentsMargins(36, 28, 36, 34)
+        layout.setSpacing(14)
+        layout.addWidget(self._label("03  /  MULLIGAN DECISION", "Eyebrow"))
+        layout.addWidget(self._label("Your opening hand", "PageTitle"))
         self.mulligan_status = QLabel("Keep this hand, or mulligan for a new hand.")
-        self.mulligan_status.setObjectName("Status")
+        self.mulligan_status.setObjectName("Instruction")
         layout.addWidget(self.mulligan_status)
-        self.mulligan_hand = QListWidget(); self.mulligan_hand.setSelectionMode(QListWidget.MultiSelection); layout.addWidget(self.mulligan_hand)
-        row = QHBoxLayout(); self.keep_btn = QPushButton("KEEP"); self.keep_btn.setObjectName("Primary"); self.keep_btn.clicked.connect(self.on_keep)
+        hand_panel = QFrame()
+        hand_panel.setObjectName("Playmat")
+        hand_layout = QVBoxLayout(hand_panel)
+        hand_layout.setContentsMargins(16, 20, 16, 20)
+        self.mulligan_cards = ZoneWidget("OPENING HAND  (7)", asset_manager=self.asset_manager, card_size=(127, 178))
+        self.mulligan_cards.card_clicked.connect(self._on_mulligan_card_clicked)
+        self.mulligan_cards.inspect_requested.connect(self.inspect_card)
+        hand_layout.addWidget(self.mulligan_cards)
+        self.mulligan_selection_hint = self._label("Click a card to select it for the bottom of your library.", "Caption")
+        hand_layout.addWidget(self.mulligan_selection_hint)
+        layout.addWidget(hand_panel, 1)
+        # Keep the authoritative physical-ID selection model for mulligan requests.
+        self.mulligan_hand = QListWidget()
+        self.mulligan_hand.setSelectionMode(QListWidget.MultiSelection)
+        self.mulligan_hand.itemSelectionChanged.connect(self._sync_mulligan_art_selection)
+        self.mulligan_hand.hide()
+        layout.addWidget(self.mulligan_hand)
+        row = QHBoxLayout()
+        row.addStretch(1)
+        self.keep_btn = QPushButton("KEEP HAND")
+        self.keep_btn.setObjectName("Keep")
+        self.keep_btn.setMinimumWidth(180)
+        self.keep_btn.clicked.connect(self.on_keep)
         self.mull_btn = QPushButton("MULLIGAN"); self.mull_btn.setObjectName("Danger"); self.mull_btn.clicked.connect(self.on_mulligan)
-        row.addWidget(self.keep_btn); row.addWidget(self.mull_btn); layout.addLayout(row)
+        self.mull_btn.setMinimumWidth(180)
+        row.addWidget(self.keep_btn); row.addWidget(self.mull_btn)
+        row.addStretch(1)
+        layout.addLayout(row)
         self.pages.addWidget(page)
+
+    @staticmethod
+    def _label(text, role):
+        label = QLabel(text)
+        label.setObjectName(role)
+        return label
+
+    def _lobby_player_panel(self, label, is_local):
+        plate = QFrame()
+        plate.setObjectName("PlayerPlate")
+        column = QVBoxLayout(plate)
+        column.setContentsMargins(20, 22, 20, 22)
+        column.addWidget(self._label(label, "Eyebrow"))
+        card_back = QLabel("✦\nMTGNP")
+        card_back.setAlignment(Qt.AlignCenter)
+        card_back.setFixedSize(130, 178)
+        card_back.setStyleSheet(
+            "background:qradialgradient(cx:0.5,cy:0.4,radius:0.8,fx:0.5,fy:0.4,"
+            "stop:0 #425431,stop:0.65 #172c24,stop:1 #0b1519);"
+            "border:5px solid #876743; border-radius:9px;"
+            "color:#e7c58e; font-family:Georgia; font-size:19px; font-weight:700;"
+        )
+        column.addWidget(card_back, alignment=Qt.AlignHCenter)
+        name = self._label(self.state.pid if is_local else "Awaiting player", "PlayerName")
+        name.setAlignment(Qt.AlignHCenter)
+        column.addWidget(name)
+        status = self._label("NOT READY" if is_local else "WAITING...", "Instruction")
+        status.setAlignment(Qt.AlignHCenter)
+        column.addWidget(status)
+        return plate, name, status
+
+    def _on_mulligan_card_clicked(self, _card_id):
+        selected_ids = set(self.mulligan_cards.selected_card_ids())
+        for index in range(self.mulligan_hand.count()):
+            item = self.mulligan_hand.item(index)
+            item.setSelected(item.text() in selected_ids)
+
+    def _sync_mulligan_art_selection(self):
+        selected = set(self._mulligan_cards_selected())
+        for card in self.mulligan_cards.findChildren(CardWidget):
+            is_selected = card.card.card_id in selected
+            card.setProperty("selected", is_selected)
+            card.setStyleSheet(CardWidget.SELECTED if is_selected else CardWidget.NORMAL)
+        self.mulligan_selection_hint.setText(
+            f"{len(selected)} selected  •  {self._mulligan_count} card(s) required to bottom"
+        )
 
     def _mulligan_cards_selected(self):
         return [self.mulligan_hand.item(i).text() for i in range(self.mulligan_hand.count()) if self.mulligan_hand.item(i).isSelected()]
 
     def _build_game_page(self):
-        page = QWidget(); layout = QVBoxLayout(page)
-        board = QHBoxLayout(); left = QVBoxLayout(); right = QVBoxLayout()
-        self.opponent_info = QLabel("Opponent")
-        self.opp_battlefield_list = ZoneWidget("Opponent Battlefield", asset_manager=self.asset_manager)
-        self.your_battlefield_list = ZoneWidget("Your Battlefield", asset_manager=self.asset_manager)
-        self.hand_list = ZoneWidget("Your Hand", asset_manager=self.asset_manager)
-        self.stack_list = ZoneWidget("The Stack", asset_manager=self.asset_manager)
-        self.exile_list = ZoneWidget("Your Exile / Suspended Cards", asset_manager=self.asset_manager)
-        self.log_text = QTextEdit(); self.log_text.setReadOnly(True)
-        for widget in (self.opp_battlefield_list, self.your_battlefield_list, self.hand_list):
-            left.addWidget(widget, 1)
-        right.addWidget(self.stack_list, 2)
-        right.addWidget(self.exile_list, 1)
-        right.addWidget(QLabel("Status / Errors")); right.addWidget(self.log_text, 1)
-        self.game_over_label = QLabel(""); self.game_over_label.setObjectName("Status")
-        right.addWidget(self.game_over_label)
-        self.rematch_btn = QPushButton("REMATCH"); self.rematch_btn.setObjectName("Primary")
-        self.rematch_btn.clicked.connect(self.send_rematch); right.addWidget(self.rematch_btn)
-        board.addLayout(left, 3); board.addLayout(right, 2); layout.addLayout(board, 1)
-        for zone in (self.opp_battlefield_list, self.your_battlefield_list, self.hand_list, self.stack_list, self.exile_list):
-            zone.inspect_requested.connect(self.inspect_card)
-        actions = QHBoxLayout()
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(8)
+        board = QHBoxLayout()
+        board.setSpacing(10)
+
+        rail = QFrame()
+        rail.setObjectName("PhaseRail")
+        rail.setFixedWidth(156)
+        phase_layout = QVBoxLayout(rail)
+        phase_layout.setContentsMargins(12, 13, 12, 12)
+        phase_layout.setSpacing(4)
+        phase_layout.addWidget(self._label("TURN SEQUENCE", "Eyebrow"))
+        self.phase_turn_label = self._label("Turn 1", "SectionTitle")
+        phase_layout.addWidget(self.phase_turn_label)
+        phase_layout.addSpacing(9)
+        phases = (
+            ("UNTAP", "Untap"), ("UPKEEP", "Upkeep"), ("DRAW", "Draw"),
+            ("PRECOMBAT_MAIN", "Main (1)"), ("BEGIN_COMBAT", "Begin Combat"),
+            ("DECLARE_ATTACKERS", "Attackers"), ("DECLARE_BLOCKERS", "Blockers"),
+            ("FIRST_STRIKE_DAMAGE", "First Strike"), ("ASSIGN_DAMAGE_ORDER", "Damage Order"),
+            ("COMBAT_DAMAGE", "Combat Damage"), ("END_OF_COMBAT", "End Combat"),
+            ("POSTCOMBAT_MAIN", "Main (2)"), ("END", "End"), ("CLEANUP", "Cleanup"),
+        )
+        self.phase_items = {}
+        for code, title in phases:
+            label = self._label("  " + title, "PhaseIdle")
+            label.setMinimumHeight(21)
+            self.phase_items[code] = label
+            phase_layout.addWidget(label)
+        phase_layout.addStretch(1)
+        phase_layout.addWidget(self._label("●  LIVE GAME", "Eyebrow"))
+        board.addWidget(rail)
+
+        playmat = QFrame()
+        playmat.setObjectName("Playmat")
+        mat_layout = QVBoxLayout(playmat)
+        mat_layout.setContentsMargins(11, 8, 11, 8)
+        mat_layout.setSpacing(3)
+        opponent_plate = QFrame()
+        opponent_plate.setObjectName("PlayerPlate")
+        opponent_row = QHBoxLayout(opponent_plate)
+        opponent_row.setContentsMargins(9, 4, 9, 4)
+        opponent_avatar = self._label("OP", "AvatarRed")
+        opponent_avatar.setFixedSize(44, 44)
+        opponent_avatar.setAlignment(Qt.AlignCenter)
+        opponent_row.addWidget(opponent_avatar)
+        opponent_labels = QVBoxLayout()
+        opponent_labels.setSpacing(0)
+        self.opponent_info = self._label("Opponent", "PlayerName")
+        self.opponent_meta = self._label("Hand: —    Library: —", "Caption")
+        opponent_labels.addWidget(self.opponent_info)
+        opponent_labels.addWidget(self.opponent_meta)
+        opponent_row.addLayout(opponent_labels, 1)
+        self.opponent_health = self._label("♥ 20", "Health")
+        opponent_row.addWidget(self.opponent_health)
+        mat_layout.addWidget(opponent_plate)
+
+        self.opp_battlefield_list = ZoneWidget(
+            "OPPONENT BATTLEFIELD", asset_manager=self.asset_manager,
+            card_size=(100, 140), compact=True,
+        )
+        mat_layout.addWidget(self.opp_battlefield_list)
+        divider = QFrame()
+        divider.setObjectName("HighlightBar")
+        divider_layout = QHBoxLayout(divider)
+        divider_layout.setContentsMargins(12, 5, 12, 5)
+        divider_layout.addWidget(self._label("⚔  BATTLEFIELD", "Eyebrow"))
+        divider_layout.addStretch()
+        self.battlefield_phase = self._label("YOUR MAIN PHASE", "PhaseCurrent")
+        divider_layout.addWidget(self.battlefield_phase)
+        mat_layout.addWidget(divider)
+        self.your_battlefield_list = ZoneWidget(
+            "YOUR BATTLEFIELD", asset_manager=self.asset_manager,
+            card_size=(100, 140), compact=True,
+        )
+        mat_layout.addWidget(self.your_battlefield_list)
+        your_plate = QFrame()
+        your_plate.setObjectName("PlayerPlate")
+        your_row = QHBoxLayout(your_plate)
+        your_row.setContentsMargins(9, 4, 9, 4)
+        your_avatar = self._label("YOU", "AvatarGreen")
+        your_avatar.setFixedSize(44, 44)
+        your_avatar.setAlignment(Qt.AlignCenter)
+        your_row.addWidget(your_avatar)
+        your_labels = QVBoxLayout()
+        your_labels.setSpacing(0)
+        self.your_info = self._label(self.state.pid, "PlayerName")
+        self.your_meta = self._label("Hand: —    Library: —", "Caption")
+        your_labels.addWidget(self.your_info)
+        your_labels.addWidget(self.your_meta)
+        your_row.addLayout(your_labels, 1)
+        self.your_health = self._label("♥ 20", "Health")
+        your_row.addWidget(self.your_health)
+        mat_layout.addWidget(your_plate)
+        self.hand_list = ZoneWidget(
+            "YOUR HAND", asset_manager=self.asset_manager,
+            card_size=(100, 140), compact=True,
+        )
+        mat_layout.addWidget(self.hand_list)
+        board.addWidget(playmat, 1)
+
+        sidebar = QFrame()
+        sidebar.setObjectName("Sidebar")
+        sidebar.setFixedWidth(282)
+        right = QVBoxLayout(sidebar)
+        right.setContentsMargins(12, 10, 12, 10)
+        right.setSpacing(6)
+        right.addWidget(self._label("THE STACK", "SectionTitle"))
+        self.stack_list = ZoneWidget(
+            "TOP RESOLVES FIRST", asset_manager=self.asset_manager,
+            card_size=(93, 132), compact=True,
+        )
+        right.addWidget(self.stack_list)
+        info_panel = QFrame()
+        info_panel.setObjectName("PlayerPlate")
+        info_layout = QVBoxLayout(info_panel)
+        info_layout.setContentsMargins(10, 8, 10, 8)
+        info_layout.setSpacing(2)
+        info_layout.addWidget(self._label("GAME INFO", "Eyebrow"))
+        self.game_info_phase = self._label("Turn —", "PhaseCurrent")
+        self.game_info_priority = self._label("Priority: —", "Caption")
+        info_layout.addWidget(self.game_info_phase)
+        info_layout.addWidget(self.game_info_priority)
+        right.addWidget(info_panel)
+        self.exile_list = ZoneWidget(
+            "EXILE / SUSPENDED", asset_manager=self.asset_manager,
+            card_size=(82, 113), compact=True,
+        )
+        right.addWidget(self.exile_list)
+
+        right.addWidget(self._label("ACTIONS", "Eyebrow"))
+        dock = QFrame()
+        dock.setObjectName("ActionDock")
+        actions = QGridLayout(dock)
+        actions.setContentsMargins(6, 7, 6, 7)
+        actions.setHorizontalSpacing(5)
+        actions.setVerticalSpacing(5)
         self.pass_btn = QPushButton("PASS PRIORITY"); self.pass_btn.clicked.connect(self.on_pass_clicked)
         self.play_land_btn = QPushButton("PLAY LAND"); self.play_land_btn.clicked.connect(self.on_play_land_clicked)
         self.cast_spell_btn = QPushButton("CAST SPELL"); self.cast_spell_btn.setObjectName("Primary"); self.cast_spell_btn.clicked.connect(self.on_cast_spell_clicked)
@@ -148,10 +424,37 @@ class MainWindow(QMainWindow):
         self.order_btn = QPushButton("CONFIRM ORDER"); self.order_btn.clicked.connect(self.on_damage_order_clicked)
         self.suspend_btn = QPushButton("SUSPEND"); self.suspend_btn.clicked.connect(self.on_suspend_clicked)
         self.concede_btn = QPushButton("CONCEDE"); self.concede_btn.setObjectName("Danger"); self.concede_btn.clicked.connect(lambda: self.dispatcher.send_concede())
-        self.action_hint = QLabel("What to do: waiting for game state..."); self.action_hint.setObjectName("Status")
+        buttons = (
+            self.pass_btn, self.play_land_btn, self.cast_spell_btn,
+            self.activate_btn, self.attack_btn, self.block_btn,
+            self.order_btn, self.suspend_btn, self.concede_btn,
+        )
+        for index, button in enumerate(buttons):
+            button.setMinimumHeight(33)
+            button.setStyleSheet("font-size:10px; padding:5px 4px;")
+            actions.addWidget(button, index // 2, index % 2)
+        right.addWidget(dock)
+        self.log_text = QTextEdit()
+        self.log_text.setReadOnly(True)
+        self.log_text.setPlaceholderText("Status / errors")
+        self.log_text.setFixedHeight(52)
+        right.addWidget(self.log_text)
+        self.game_over_label = self._label("", "Status")
+        self.game_over_label.setWordWrap(True)
+        right.addWidget(self.game_over_label)
+        self.rematch_btn = QPushButton("REMATCH")
+        self.rematch_btn.setObjectName("Keep")
+        self.rematch_btn.clicked.connect(self.send_rematch)
+        right.addWidget(self.rematch_btn)
+        right.addStretch(1)
+        board.addWidget(sidebar)
+        layout.addLayout(board, 1)
+        self.action_hint = self._label("What to do: waiting for game state...", "Instruction")
+        self.action_hint.setWordWrap(True)
         layout.addWidget(self.action_hint)
-        for button in (self.pass_btn, self.play_land_btn, self.cast_spell_btn, self.activate_btn, self.attack_btn, self.block_btn, self.order_btn, self.suspend_btn, self.concede_btn): actions.addWidget(button)
-        layout.addLayout(actions); self.pages.addWidget(page)
+        for zone in (self.opp_battlefield_list, self.your_battlefield_list, self.hand_list, self.stack_list, self.exile_list):
+            zone.inspect_requested.connect(self.inspect_card)
+        self.pages.addWidget(page)
 
     def connect_to_server(self):
         try:
@@ -185,6 +488,7 @@ class MainWindow(QMainWindow):
         self.dispatcher.send_player_ready()
         self._ready_sent = True
         self.lobby_status.setText("Ready. Waiting for opponent.")
+        self._refresh_visuals(self.state.phase, self.state.turn, self.state.priority_holder, self.presenter.opponent_id() or "Opponent")
 
     def send_rematch(self):
         self.state.reset_for_lobby()
@@ -193,6 +497,7 @@ class MainWindow(QMainWindow):
         self._mulligan_waiting = False
         self._mulligan_kept = False
         self.dispatcher.send_player_ready()
+        self._ready_sent = True
 
     def close_connection(self):
         self.dispatcher.connection.close()
@@ -229,6 +534,7 @@ class MainWindow(QMainWindow):
         elif phase in {"GAME_SETUP", "LOBBY"}: self.pages.setCurrentWidget(self.pages.widget(1))
         else: self.pages.setCurrentWidget(self.pages.widget(3))
         self._refresh_lists(opponent)
+        self._refresh_visuals(phase, turn, holder, opponent)
         self._refresh_actions(phase)
         self._refresh_guidance(phase, holder, opponent)
         self._refresh_choice()
@@ -249,7 +555,10 @@ class MainWindow(QMainWindow):
             self.mulligan_hand.clear()
             for card_id in hand_ids:
                 self.mulligan_hand.addItem(card_id)
+            self.mulligan_cards.set_cards([self.presenter.card(card_id) for card_id in hand_ids])
+            self.mulligan_cards.title.setText(f"OPENING HAND  ({len(hand_ids)})")
             self._mulligan_hand_ids = hand_ids
+            self._sync_mulligan_art_selection()
             if self._mulligan_waiting:
                 self._mulligan_waiting = False
                 self.keep_btn.setEnabled(True)
@@ -265,6 +574,38 @@ class MainWindow(QMainWindow):
         self.opp_battlefield_list.set_cards([self.presenter.card(card.get("id", str(card)), selectable=False) for card in self.state.battlefield.get(opponent, [])])
         self.stack_list.set_cards([self.presenter.card(item.get("source", "Ability")) for item in self.state.stack])
         self.exile_list.set_cards([self.presenter.card(card_id) for card_id in self.state.exile.get(self.state.pid, [])])
+
+    def _refresh_visuals(self, phase, turn, holder, opponent):
+        """Update the labels in the Stitch board without touching gameplay selection."""
+        self.phase_turn_label.setText(f"Turn {turn or 1}")
+        for code, label in self.phase_items.items():
+            active = code == phase
+            label.setObjectName("PhaseCurrent" if active else "PhaseIdle")
+            label.setText(("▸ " if active else "  ") + label.text().lstrip("▸ "))
+            label.style().unpolish(label)
+            label.style().polish(label)
+        self.battlefield_phase.setText(phase.replace("_", " ").title())
+        self.game_info_phase.setText(f"Turn {turn or 1}   /   {phase.replace('_', ' ').title()}")
+        self.game_info_priority.setText(f"Priority: {'You' if holder == self.state.pid else holder or 'None'}")
+        self.opponent_info.setText(opponent)
+        self.your_info.setText(self.state.pid)
+        self.opponent_health.setText(f"♥ {self.state.life_totals.get(opponent, 20)}")
+        self.your_health.setText(f"♥ {self.state.life_totals.get(self.state.pid, 20)}")
+        self.opponent_meta.setText(
+            f"Hand: {self.state.hand_counts.get(opponent, '—')}   "
+            f"Library: {self.state.library_counts.get(opponent, '—')}   "
+            f"Grave: {len(self.state.graveyard.get(opponent, []))}"
+        )
+        self.your_meta.setText(
+            f"Hand: {len(self.state.local_hand)}   "
+            f"Library: {self.state.library_counts.get(self.state.pid, '—')}   "
+            f"Grave: {len(self.state.graveyard.get(self.state.pid, []))}"
+        )
+        self.local_lobby_name.setText(self.state.pid)
+        self.local_lobby_state.setText("● READY" if self._ready_sent else "○ NOT READY")
+        self.opponent_lobby_name.setText(opponent if opponent != "Opponent" else "Awaiting player")
+        self.opponent_lobby_state.setText("● CONNECTED" if opponent != "Opponent" else "○ WAITING...")
+        self.ready_btn.setEnabled(not self._ready_sent)
 
     def inspect_card(self, card_id):
         self._inspector = CardInspector(self.presenter.card(card_id), self.asset_manager, self)

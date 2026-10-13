@@ -8,7 +8,11 @@ class CardWidget(QFrame):
     clicked = Signal(str)
     inspect_requested = Signal(str)
 
-    def __init__(self, card, parent=None, asset_manager=None, variant="full"):
+    NORMAL = "QFrame#CardWidget { background:#202b2c; border:1px solid #526459; border-radius:6px; }"
+    SELECTED = "QFrame#CardWidget { background:#26452b; border:3px solid #86ce62; border-radius:6px; }"
+    HOVERED = "QFrame#CardWidget { background:#263b40; border:2px solid #e8aa55; border-radius:6px; }"
+
+    def __init__(self, card, parent=None, asset_manager=None, variant="full", card_size=(150, 210)):
         super().__init__(parent)
         self.card = card
         self._asset_variant = variant
@@ -18,7 +22,7 @@ class CardWidget(QFrame):
         self.asset_manager = asset_manager
         self._asset_base = CardCatalog.base_card_id(card.card_id)
         self.setObjectName("CardWidget")
-        self.setFixedSize(150, 210)
+        self.setFixedSize(*card_size)
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.card_layout = QVBoxLayout(self)
         self.card_layout.setContentsMargins(6, 5, 6, 5)
@@ -46,7 +50,8 @@ class CardWidget(QFrame):
             self.tapped_label = QLabel("TAPPED", alignment=Qt.AlignCenter)
             self.tapped_label.setStyleSheet("background:#725c24; color:white; font-weight:700;")
             self.card_layout.addWidget(self.tapped_label)
-        self.setStyleSheet("QFrame#CardWidget { background:#25313a; border:1px solid #596775; border-radius:8px; }")
+        self.setStyleSheet(self.NORMAL)
+        self.setToolTip(f"{card.name}\n{card.card_type}\nDouble-click to inspect")
         if asset_manager:
             asset_manager.image_ready.connect(self._on_image_ready)
             asset_manager.request(card.card_id, variant)
@@ -58,14 +63,15 @@ class CardWidget(QFrame):
         if self.tapped_label:
             self.tapped_label.hide()
         self.card_layout.setContentsMargins(4, 4, 4, 4)
-        self.art_label.setFixedSize(140, 200)
-        self.art_label.setPixmap(pixmap.scaled(140, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        width, height = self.width() - 10, self.height() - 10
+        self.art_label.setFixedSize(width, height)
+        self.art_label.setPixmap(pixmap.scaled(width, height, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         self.art_label.setText("")
 
     def mousePressEvent(self, event):
         if self.selectable:
             self.setProperty("selected", not bool(self.property("selected")))
-            self.setStyleSheet("QFrame#CardWidget { background:#405c45; border:2px solid #e4b56a; border-radius:8px; }" if self.property("selected") else "QFrame#CardWidget { background:#25313a; border:1px solid #596775; border-radius:8px; }")
+            self.setStyleSheet(self.SELECTED if self.property("selected") else self.NORMAL)
         self.clicked.emit(self.card.card_id)
         super().mousePressEvent(event)
 
@@ -76,12 +82,12 @@ class CardWidget(QFrame):
 
     def enterEvent(self, event):
         if self.selectable and not self.property("selected"):
-            self.setStyleSheet("QFrame#CardWidget { background:#344b60; border:2px solid #7fa8c9; border-radius:8px; }")
+            self.setStyleSheet(self.HOVERED)
         super().enterEvent(event)
 
     def leaveEvent(self, event):
         if not self.property("selected"):
-            self.setStyleSheet("QFrame#CardWidget { background:#25313a; border:1px solid #596775; border-radius:8px; }")
+            self.setStyleSheet(self.NORMAL)
         super().leaveEvent(event)
 
 
@@ -118,11 +124,16 @@ class ZoneWidget(QFrame):
     card_clicked = Signal(str)
     inspect_requested = Signal(str)
 
-    def __init__(self, title, parent=None, asset_manager=None):
+    def __init__(self, title, parent=None, asset_manager=None, card_size=(150, 210), compact=False):
         super().__init__(parent)
+        self.setObjectName("ZoneWidget")
+        self.card_size = card_size
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.layout = QVBoxLayout(self)
+        self.layout.setContentsMargins(6 if compact else 10, 5, 6 if compact else 10, 6)
+        self.layout.setSpacing(4)
         self.title = QLabel(title)
-        self.title.setStyleSheet("font-weight:700; color:#e3b56a;")
+        self.title.setObjectName("ZoneTitle")
         self.layout.addWidget(self.title)
         self.cards_layout = QHBoxLayout()
         self.cards_layout.setContentsMargins(8, 4, 8, 4)
@@ -134,8 +145,10 @@ class ZoneWidget(QFrame):
         self.scroll.setWidgetResizable(False)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.scroll.setMinimumHeight(232)
-        self.scroll.setMaximumHeight(245)
+        self.scroll.setObjectName("CardScroll")
+        self.scroll.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.scroll.setFixedHeight(card_size[1] + 23)
+        self.scroll.setMinimumWidth(0)
         self.scroll.setWidget(self.cards_host)
         self.layout.addWidget(self.scroll)
         self.asset_manager = asset_manager
@@ -152,10 +165,10 @@ class ZoneWidget(QFrame):
             if item.widget():
                 item.widget().deleteLater()
         for card in cards:
-            widget = CardWidget(card, asset_manager=self.asset_manager)
+            widget = CardWidget(card, asset_manager=self.asset_manager, card_size=self.card_size)
             if card.card_id in selected:
                 widget.setProperty("selected", True)
-                widget.setStyleSheet("QFrame#CardWidget { background:#405c45; border:2px solid #e4b56a; border-radius:8px; }")
+                widget.setStyleSheet(CardWidget.SELECTED)
             widget.clicked.connect(self.card_clicked)
             widget.inspect_requested.connect(self.inspect_requested)
             self.cards_layout.addWidget(widget)
@@ -183,7 +196,7 @@ class ZoneWidget(QFrame):
     def clear_selection(self):
         for widget in self.findChildren(CardWidget):
             widget.setProperty("selected", False)
-            widget.setStyleSheet("QFrame#CardWidget { background:#25313a; border:1px solid #596775; border-radius:8px; }")
+            widget.setStyleSheet(CardWidget.NORMAL)
 
     # Backward-compatible name used only by existing Qt action code.
     def selected_ids(self):
