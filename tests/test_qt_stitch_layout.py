@@ -77,6 +77,16 @@ class TestStitchBoardLayout(unittest.TestCase):
                      self.window.opp_battlefield_list):
             self.assertLessEqual(zone.geometry().bottom(),
                                  zone.parentWidget().height(), zone.title.text())
+        scrollbar = self.window.playmat_scroll.verticalScrollBar()
+        self.assertGreater(scrollbar.maximum(), 0)
+        scrollbar.setValue(scrollbar.maximum())
+        app.processEvents()
+        viewport = self.window.playmat_scroll.viewport()
+        hand_bottom = self.window.hand_list.mapTo(
+            viewport, self.window.hand_list.rect().bottomRight()
+        ).y()
+        self.assertLessEqual(hand_bottom, viewport.height())
+        self.assertGreater(hand_bottom, 0)
         screenshot_path = os.environ.get("MTGNP_UI_SCREENSHOT_SMALL")
         if screenshot_path:
             self.assertTrue(self.window.grab().save(screenshot_path))

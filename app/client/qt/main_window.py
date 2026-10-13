@@ -416,7 +416,18 @@ class MainWindow(QMainWindow):
             card_size=(100, 140), compact=True,
         )
         mat_layout.addWidget(self.hand_list)
-        board.addWidget(playmat, 1)
+        # At the minimum demo size, all three fixed-height card rows cannot
+        # fit vertically.  Scroll the *whole* playmat instead of clipping the
+        # bottom half of battlefield / hand cards.
+        playmat.setMinimumHeight(mat_layout.minimumSize().height())
+        self.playmat_scroll = QScrollArea()
+        self.playmat_scroll.setObjectName("BattlefieldScroll")
+        self.playmat_scroll.setFrameShape(QFrame.NoFrame)
+        self.playmat_scroll.setWidgetResizable(True)
+        self.playmat_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.playmat_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.playmat_scroll.setWidget(playmat)
+        board.addWidget(self.playmat_scroll, 1)
 
         sidebar = QFrame()
         sidebar.setObjectName("Sidebar")

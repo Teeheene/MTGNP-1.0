@@ -92,6 +92,8 @@ QFrame#PlayerPlate { background:rgba(20,18,13,0.72); border:1px solid #4b402d; }
 QFrame#BattlefieldDivider { background:rgba(16,15,10,0.40); border:0px; border-top:1px solid #8b743b; border-bottom:1px solid #8b743b; }
 QFrame#ArcaneRail { background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #1e1b12,stop:1 #130f0a); border:0px; border-right:1px solid #514630; }
 QFrame#ActionDock { background:#1b1812; border-color:#463d2d; }
+QScrollArea#BattlefieldScroll { background:transparent; border:0px; }
+QScrollArea#BattlefieldScroll > QWidget > QWidget { background:transparent; }
 QScrollArea#CardScroll { background:rgba(19,16,11,0.12); border:1px solid rgba(190,164,101,0.26); }
 QScrollBar:horizontal, QScrollBar:vertical { background:#17150f; }
 QScrollBar::handle:horizontal, QScrollBar::handle:vertical { background:#817048; }

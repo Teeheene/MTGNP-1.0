@@ -33,6 +33,7 @@ class CardWidget(QFrame):
         self.card_layout.addWidget(self.name_label)
         self.art_label = QLabel("Artwork unavailable")
         self.art_label.setAlignment(Qt.AlignCenter)
+        self.art_label.setWordWrap(True)
         self.art_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.art_label.setStyleSheet("background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #4a3e2b,stop:1 #1b1a16); color:#c7bda5; border-radius:4px;")
         self.card_layout.addWidget(self.art_label, 1)
