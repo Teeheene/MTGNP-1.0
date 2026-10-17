@@ -131,7 +131,12 @@ class StateBuilder:
                 client.pid: list(client.graveyard)
                 for client in clients
             },
+            "exile": {
+                client.pid: list(getattr(client, "exile", []))
+                for client in clients
+            },
             "stack": _clean_stack(self.server.stack),
+            "suspended_cards": [dict(entry) for entry in getattr(self.server, "suspended_cards", [])],
         }
 
     def build_untap_state(self, viewing_client):
@@ -169,7 +174,12 @@ class StateBuilder:
                 client.pid: list(client.graveyard)
                 for client in clients
             },
+            "exile": {
+                client.pid: list(getattr(client, "exile", []))
+                for client in clients
+            },
             "stack": _clean_stack(self.server.stack),
+            "suspended_cards": [dict(entry) for entry in getattr(self.server, "suspended_cards", [])],
         }
 
     def build_game_state(self, viewing_client):
@@ -209,7 +219,12 @@ class StateBuilder:
                 client.pid: list(client.graveyard)
                 for client in clients
             },
+            "exile": {
+                client.pid: list(getattr(client, "exile", []))
+                for client in clients
+            },
             "stack": _clean_stack(getattr(self.server, "stack", [])),
+            "suspended_cards": [dict(entry) for entry in getattr(self.server, "suspended_cards", [])],
             "attackers": list(getattr(self.server, "attackers", [])),
             "blockers": list(getattr(self.server, "blockers", [])),
 

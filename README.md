@@ -40,14 +40,26 @@ python -m app.server --verbose --port 4444
 ### 2. Start the CLI Client
 
 ```bash
-python -m app.client --player-id alice --server-host 127.0.0.1 --server-port 4444
+python -m app.client --player-id alice --host 127.0.0.1 --port 4444
 ```
 
 ### 3. Start the PySide6 Graphical Client
 
 ```bash
-python -m app.client.qt --player-id bob --server-host 127.0.0.1 --server-port 4444
+python -m app.client --qt --player-id bob --host 127.0.0.1 --port 4444
 ```
+
+Verbose prerequisite (run in separate terminals):
+
+```bash
+python -m app.server -v --port 4444
+python -m app.client -v --player-id alice --host 127.0.0.1 --port 4444
+python -m app.client -v --player-id bob --host 127.0.0.1 --port 4444
+```
+
+AI usage: OpenAI Codex/ChatGPT were used for implementation assistance, test generation,
+verification, and documentation. Contributions and the work-distribution matrix must be reviewed
+by the student before submission: **REVIEW BEFORE SUBMISSION**.
 
 ---
 
@@ -58,3 +70,24 @@ Execute the entire test suite across unit, domain engine, GUI, and real-socket i
 ```bash
 python -m pytest tests/ -v
 ```
+
+The Qt client is an off-screen-testable PySide6 desktop client. It provides connection and
+lobby/deck selection, London mulligan, battlefield/hand/stack/exile views, priority, casting,
+targets, mana and kicker prompts, activated abilities, combat assignment, trigger/card-choice
+dialogs, suspend, concede, game-over, and same-socket rematch. The server remains authoritative;
+the experimental `CARD_CHOICE_REQUEST`/`CARD_CHOICE_RESPONSE` and `SUSPEND_CARD` PDUs are
+documented in `CSNETWK_MP_MTGNP.md` and handled by both CLI and Qt clients.
+
+For headless CI use:
+
+```bash
+QT_QPA_PLATFORM=offscreen python -m pytest tests/ -v --tb=short
+```
+
+### Card artwork cache
+
+Artwork is fetched asynchronously from Scryfall and cached under the platform user cache
+(`QStandardPaths.CacheLocation/MTGNP/cards`). Internet access is optional after caching; failed
+requests retain fully playable metadata-only cards. The optional developer utility
+`python -m app.client.qt.precache_assets` warms one request per unique base card. Artwork is
+presentation-only and remains owned by its provider.

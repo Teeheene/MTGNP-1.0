@@ -23,6 +23,8 @@ class ClientState:
         self.battlefield = {}
         self.graveyard = {}
         self.stack = []
+        self.exile = {}
+        self.suspended_cards = []
         self.land_played_this_turn = False
         self.attackers = []
         self.blockers = []
@@ -36,18 +38,24 @@ class ClientState:
         self.last_received_pdu_seq_num = None
         self.player_ready_seq_num = 1
         self.priority_seq_num = None
+        self.mulligan_seq_num = None
+        self.cleanup_seq_num = None
         self.phase_seq_num = None
         self.trigger_seq_num = None
+        self.card_choice_seq_num = None
         self.heartbeat_seq_num = 1
 
 
         #server prompts and results
         self.pending_request = None
+        self.pending_card_choice = None
         self.last_stack_resolution = None
         self.last_combat_damage_result = None
         self.last_pong_timestamp = None
+        self.last_error = None
         self.is_game_over = False
         self.game_over_info = None
+        self.on_state_change = None
 
     def update_game_state(self, state_dict):
         self.current_state = state_dict
@@ -67,6 +75,8 @@ class ClientState:
             self.battlefield = state_dict["battlefield"]
         if "stack" in state_dict:
             self.stack = state_dict["stack"]
+        if "exile" in state_dict:
+            self.exile = state_dict["exile"]
 
     def reset_for_lobby(self):
         self.phase = "LOBBY"
@@ -81,6 +91,8 @@ class ClientState:
         self.battlefield = {}
         self.graveyard = {}
         self.stack = []
+        self.exile = {}
+        self.suspended_cards = []
         self.land_played_this_turn = False
         self.attackers = []
         self.blockers = []
@@ -90,12 +102,17 @@ class ClientState:
         self.pending_damage_orders = []
 
         self.priority_seq_num = None
+        self.mulligan_seq_num = None
+        self.cleanup_seq_num = None
         self.phase_seq_num = None
         self.trigger_seq_num = None
+        self.card_choice_seq_num = None
 
         self.pending_request = None
+        self.pending_card_choice = None
         self.last_stack_resolution = None
         self.last_combat_damage_result = None
+        self.last_error = None
         self.is_game_over = False
         self.game_over_info = None
 

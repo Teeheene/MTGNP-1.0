@@ -172,6 +172,16 @@ class TriggerManager:
                     effect_fn=lambda item, game: self._resolve_gray_merchant(ctrl, game),
                 )
                 detected.append(trg)
+            elif base_id == "goblin_bushwhacker" and event.data.get("kicked"):
+                trg = TriggeredAbility(
+                    trigger_id=self.generate_trigger_id(),
+                    source_id=creature_id,
+                    controller=ctrl,
+                    effect_summary="Creatures you control get +1/+0 and gain haste until end of turn.",
+                    requires_target=False,
+                    effect_fn=lambda item, game: self._resolve_bushwhacker(ctrl, game),
+                )
+                detected.append(trg)
             elif base_id == "gravedigger":
                 ctrl_client = self.game.client_for_player(ctrl) if hasattr(self.game, "client_for_player") else None
                 gy = list(ctrl_client.graveyard) if ctrl_client else []
@@ -216,6 +226,15 @@ class TriggerManager:
             perm["temp_power_buff"] = perm.get("temp_power_buff", 0) + 1
             perm["temp_toughness_buff"] = perm.get("temp_toughness_buff", 0) + 1
 
+    def _resolve_bushwhacker(self, controller: str, game: Any):
+        ctrl_client = game.client_for_player(controller)
+        if ctrl_client:
+            for perm in ctrl_client.battlefield:
+                data = game.card_data(perm.get("id", "")) or {}
+                if "creature" in data.get("card_type", "").casefold():
+                    perm["temp_power_buff"] = perm.get("temp_power_buff", 0) + 1
+                    perm["temporary_haste"] = True
+
     def _resolve_gray_merchant(self, controller: str, game: Any):
         ctrl_client = game.client_for_player(controller) if hasattr(game, "client_for_player") else None
         if ctrl_client:
@@ -223,7 +242,7 @@ class TriggerManager:
             opp_client = game.other_client(ctrl_client) if hasattr(game, "other_client") else None
             if opp_client:
                 opp_client.life_total -= devotion
-            ctrl_client.life_total += devotion
+            game.gain_life(ctrl_client, devotion)
 
     def _resolve_gravedigger(self, controller: str, item: Dict[str, Any], game: Any):
         target = item.get("target")

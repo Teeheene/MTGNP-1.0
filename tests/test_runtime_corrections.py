@@ -723,3 +723,207 @@ class TestRuntimeCorrections(unittest.TestCase):
         all_trg_ids = [t.trigger_id for t in self.game.trigger_manager.pending_triggers] + [item.get("trigger_id") for item in self.game.stack if item.get("trigger_id")]
         self.assertIn("trg_b1", all_trg_ids)
         self.assertIn("trg_b2", all_trg_ids)
+
+
+class TestFinalFreezeFixes(TestRuntimeCorrections):
+    def setUp(self):
+        super().setUp()
+        import socket
+        from app.server.connection import ServerConnection
+        temp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        temp_sock.bind(("127.0.0.1", 0))
+        self.port = temp_sock.getsockname()[1]
+        temp_sock.close()
+
+        self.server = ServerConnection(host="127.0.0.1", port=self.port, verbose=False)
+        self.server.start()
+
+    def tearDown(self):
+        self.server.running = False
+        try:
+            self.server.sock.close()
+        except Exception:
+            pass
+
+    def test_lobby_socket_servicing_flow(self):
+        """Req 1: Real-socket regression proving Alice ready, Bob connected/undecided, Alice PING->PONG, replacement READY, 3rd socket refused, Bob READY -> game starts."""
+        import socket
+        import threading
+        from app.shared.protocol import encode_pdu, decode_pdu
+
+        server_thread = threading.Thread(target=self.server.wait_for_players, daemon=True)
+        server_thread.start()
+
+        c1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        c1.settimeout(2.0)
+        c1.connect(("127.0.0.1", self.port))
+
+        c2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        c2.settimeout(2.0)
+        c2.connect(("127.0.0.1", self.port))
+
+        deck1 = [f"mountain_{i:03d}" for i in range(1, 21)]
+        deck1_alt = [f"swamp_{i:03d}" for i in range(1, 21)]
+        deck2 = [f"forest_{i:03d}" for i in range(1, 21)]
+
+        # Alice sends PLAYER_READY
+        c1.sendall(encode_pdu({"type": "PLAYER_READY", "seq_num": 1, "player_id": "alice", "deck_list": deck1}))
+        p1 = decode_pdu(c1)
+        self.assertEqual(p1["type"], "GAME_STATE_UPDATE")
+        self.assertEqual(p1["state"]["phase"], "LOBBY")
+
+        # Alice sends PING -> receives matching PONG
+        c1.sendall(encode_pdu({"type": "PING", "seq_num": 42, "timestamp": 123456}))
+        pong = decode_pdu(c1)
+        self.assertEqual(pong["type"], "PONG")
+        self.assertEqual(pong["seq_num"], 42)
+        self.assertEqual(pong["timestamp"], 123456)
+
+        # Alice sends replacement PLAYER_READY -> accepted
+        c1.sendall(encode_pdu({"type": "PLAYER_READY", "seq_num": 2, "player_id": "alice", "deck_list": deck1_alt}))
+        p1_alt = decode_pdu(c1)
+        self.assertEqual(p1_alt["type"], "GAME_STATE_UPDATE")
+
+        # 3rd connection attempt -> refused
+        c3 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        c3.settimeout(2.0)
+        c3.connect(("127.0.0.1", self.port))
+        err = decode_pdu(c3)
+        self.assertEqual(err["type"], "ERROR")
+        self.assertEqual(err["code"], "ILLEGAL_ACTION")
+        self.assertIn("Lobby full", err["message"])
+        c3.close()
+
+        # Bob sends PLAYER_READY -> game starts
+        c2.sendall(encode_pdu({"type": "PLAYER_READY", "seq_num": 1, "player_id": "bob", "deck_list": deck2}))
+
+        # Read lobby readiness update (sent when Bob ready)
+        st1_lobby = decode_pdu(c1)
+        st2_lobby = decode_pdu(c2)
+        self.assertEqual(st1_lobby["type"], "GAME_STATE_UPDATE")
+
+        # Read PHASE_TRANSITION to MULLIGAN
+        st1_pt = decode_pdu(c1)
+        st2_pt = decode_pdu(c2)
+        self.assertEqual(st1_pt["type"], "PHASE_TRANSITION")
+
+        # Read GAME_STATE_UPDATE (game setup/mulligan phase)
+        st1_game = decode_pdu(c1)
+        st2_game = decode_pdu(c2)
+        self.assertEqual(st1_game["type"], "GAME_STATE_UPDATE")
+        self.assertIn(st1_game["state"]["phase"], {"GAME_SETUP", "MULLIGAN"})
+
+        # Prove socket timeout restored for gameplay (can set non-blocking/blocking without lobby timeout)
+        self.assertIsNone(self.server.clients[0].sock.gettimeout())
+
+        c1.close()
+        c2.close()
+
+    def test_priority_reissue_bookkeeping(self):
+        """Req 2: valid PRIORITY_GRANT -> stale priority action -> ERROR -> fresh reissued PRIORITY_GRANT -> CONCEDE using reissued grant's seq -> accepted."""
+        c1 = self.create_mock_client("alice", 1001)
+        c2 = self.create_mock_client("bob", 1002)
+
+        self.game.clients = [c1, c2]
+        self.mock_connection.clients = [c1, c2]
+
+        # 1. Valid PRIORITY_GRANT
+        pdu_grant = self.game.pdu_dispatcher.send_priority_grant(c1, "alice")
+        valid_seq = pdu_grant["seq_num"]
+        self.assertEqual(c1.active_priority_seq_num, valid_seq)
+
+        # 2. Stale priority action
+        stale_pdu = {
+            "type": "PRIORITY_PASS",
+            "seq_num": 99999
+        }
+        res = self.game.pdu_dispatcher.handle_priority_pass(c1, stale_pdu)
+        self.assertFalse(res)
+
+        # Reissued grant seq must be fresh (> valid_seq)
+        reissued_seq = c1.active_priority_seq_num
+        self.assertGreater(reissued_seq, valid_seq)
+
+        # 3. CONCEDE using the reissued grant's seq -> accepted
+        concede_pdu = {
+            "type": "CONCEDE",
+            "seq_num": reissued_seq,
+            "player_id": "alice"
+        }
+        res_concede = self.game.pdu_dispatcher.handle_concede(c1, concede_pdu)
+        self.assertTrue(res_concede)
+        self.assertTrue(self.game.game_over)
+
+    def test_global_mandatory_trigger_gating(self):
+        """Req 3: Alice has pending TRIGGER_CHOICE/TRIGGER_ORDER -> Bob attempts action -> rejected -> Alice answers -> normal gameplay resumes."""
+        c1 = self.create_mock_client("alice", 1001)
+        c2 = self.create_mock_client("bob", 1002)
+
+        self.game.clients = [c1, c2]
+        self.mock_connection.clients = [c1, c2]
+
+        # 1. Alice has pending TRIGGER_CHOICE
+        c1.pending_trigger_choice = {"trigger_id": "trg_001", "requires_target": False, "legal_targets": []}
+        c1.active_trigger_seq_num = 50
+
+        # Bob attempts a gameplay action
+        bob_pdu = {"type": "PRIORITY_PASS", "seq_num": 10}
+        res_bob = self.game.pdu_dispatcher.handle(c2, bob_pdu)
+        self.assertFalse(res_bob)
+
+        # Alice answers trigger choice
+        alice_resp = {
+            "type": "TRIGGER_CHOICE_RESPONSE",
+            "seq_num": 50,
+            "trigger_id": "trg_001",
+            "accept": True,
+            "chosen_target": None
+        }
+        res_alice = self.game.pdu_dispatcher.handle_trigger_choice_response(c1, alice_resp)
+        self.assertTrue(res_alice)
+        self.assertIsNone(c1.pending_trigger_choice)
+
+        # 2. Repeat for TRIGGER_ORDER
+        c1.pending_trigger_ids = ["trg_101", "trg_102"]
+        c1.active_trigger_seq_num = 55
+
+        # Bob attempts gameplay action
+        res_bob2 = self.game.pdu_dispatcher.handle(c2, bob_pdu)
+        self.assertFalse(res_bob2)
+
+        # Alice answers trigger order
+        alice_order_resp = {
+            "type": "TRIGGER_ORDER_RESPONSE",
+            "seq_num": 55,
+            "ordered_trigger_ids": ["trg_102", "trg_101"]
+        }
+        res_alice2 = self.game.pdu_dispatcher.handle_trigger_order_response(c1, alice_order_resp)
+        self.assertTrue(res_alice2)
+        self.assertIsNone(c1.pending_trigger_ids)
+
+    def test_client_exile_state_tracking(self):
+        """Req 4: GAME_STATE_UPDATE containing exile populates ClientState.exile."""
+        state = ClientState("alice")
+        dispatcher = ClientPduDispatcher(state, MagicMock())
+
+        update_pdu = {
+            "type": "GAME_STATE_UPDATE",
+            "seq_num": 100,
+            "state": {
+                "turn": 1,
+                "phase": "PRECOMBAT_MAIN",
+                "active_player": "alice",
+                "priority_holder": "alice",
+                "life_totals": {"alice": 20, "bob": 20},
+                "hand": ["island_001"],
+                "hand_counts": {"bob": 7},
+                "library_counts": {"alice": 40, "bob": 40},
+                "battlefield": {"alice": [], "bob": []},
+                "graveyard": {"alice": [], "bob": []},
+                "exile": {"alice": ["rift_bolt_001"], "bob": ["reckless_wurm_001"]},
+                "stack": [],
+                "suspended_cards": [],
+            }
+        }
+        dispatcher.handle(update_pdu)
+        self.assertEqual(state.exile, {"alice": ["rift_bolt_001"], "bob": ["reckless_wurm_001"]})

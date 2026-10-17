@@ -14,6 +14,7 @@ class PduDispatcher:
             "STACK_PUSH": self.handle_stack_push,
             "TRIGGER_ORDER": self.handle_trigger_order,
             "TRIGGER_CHOICE": self.handle_trigger_choice,
+            "CARD_CHOICE_REQUEST": self.handle_card_choice_request,
             "STACK_RESOLVE": self.handle_stack_resolve,
             "COMBAT_DAMAGE_RESULT": self.handle_combat_damage_result,
             "GAME_OVER": self.handle_game_over,
@@ -37,6 +38,9 @@ class PduDispatcher:
                 f"Unknown PDU type: {pdu_type}"
             )
         handler(pdu)
+        callback = getattr(self.state, "on_state_change", None)
+        if callable(callback):
+            callback()
 
     #receive pdus
     def handle_game_state_update(self, pdu):
@@ -64,7 +68,9 @@ class PduDispatcher:
             "library_counts",
             "battlefield",
             "graveyard",
+            "exile",
             "stack",
+            "suspended_cards",
             "land_played_this_turn",
             "attackers",
             "blockers",
@@ -76,6 +82,10 @@ class PduDispatcher:
         for field in remembered_fields:
             if field in server_state:
                 setattr(self.state, field, deepcopy(server_state[field]))
+        if server_state.get("phase") == "MULLIGAN":
+            self.state.mulligan_seq_num = pdu.get("seq_num")
+        elif server_state.get("phase") == "CLEANUP":
+            self.state.cleanup_seq_num = pdu.get("seq_num")
 
         if isinstance(self.state.hand, dict):
             self.state.local_hand = list(self.state.hand.get(self.state.pid, []))
@@ -102,6 +112,8 @@ class PduDispatcher:
         self.state.priority_holder = pdu.get("player_id")
 
     def handle_stack_push(self, pdu):
+        self.state.pending_card_choice = None
+        self.state.card_choice_seq_num = None
         stack_item = {
             key: deepcopy(value)
             for key, value in pdu.items()
@@ -117,7 +129,13 @@ class PduDispatcher:
         self.state.trigger_seq_num = pdu["seq_num"]
         self.state.pending_request = deepcopy(pdu)
 
+    def handle_card_choice_request(self, pdu):
+        self.state.card_choice_seq_num = pdu["seq_num"]
+        self.state.pending_card_choice = deepcopy(pdu)
+
     def handle_stack_resolve(self, pdu):
+        self.state.pending_card_choice = None
+        self.state.card_choice_seq_num = None
         stack_item_id = pdu.get("stack_item_id")
         self.state.stack = [
             item for item in self.state.stack
@@ -181,7 +199,7 @@ class PduDispatcher:
     def send_mulligan_choice(self, keep, cards_to_bottom=None):
         self.connection.send({
             "type": "MULLIGAN_CHOICE",
-            "seq_num": self.state.latest_seq_num,
+            "seq_num": self.state.mulligan_seq_num,
             "keep": keep,
             "cards_to_bottom": list(cards_to_bottom or [])
         })
@@ -192,14 +210,17 @@ class PduDispatcher:
             "seq_num": self._priority_seq_num()
         })
 
-    def send_cast_spell(self, card_id, targets=None, mana_payment=None):
-        self.connection.send({
+    def send_cast_spell(self, card_id, targets=None, mana_payment=None, mode=None):
+        pdu = {
             "type": "CAST_SPELL",
             "seq_num": self._priority_seq_num(),
             "card_id": card_id,
             "targets": list(targets or []),
             "mana_payment": dict(mana_payment or {})
-        })
+        }
+        if mode is not None:
+            pdu["mode"] = mode
+        self.connection.send(pdu)
 
     def send_activate_ability(
         self,
@@ -274,7 +295,7 @@ class PduDispatcher:
     def send_discard(self, card_ids):
         self.connection.send({
             "type": "DISCARD",
-            "seq_num": self.state.latest_seq_num,
+            "seq_num": self.state.cleanup_seq_num,
             "card_ids": list(card_ids)
         })
 
@@ -283,6 +304,24 @@ class PduDispatcher:
             "type": "CONCEDE",
             "seq_num": self.state.last_received_pdu_seq_num,
             "player_id": self.state.pid
+        })
+
+    def send_card_choice_response(self, **response):
+        pdu = {
+            "type": "CARD_CHOICE_RESPONSE",
+            "seq_num": self.state.card_choice_seq_num,
+            "player_id": self.state.pid,
+            **response,
+        }
+        self.connection.send(pdu)
+
+    def send_suspend_card(self, card_id, mana_payment):
+        self.connection.send({
+            "type": "SUSPEND_CARD",
+            "seq_num": self._priority_seq_num(),
+            "player_id": self.state.pid,
+            "card_id": card_id,
+            "mana_payment": dict(mana_payment or {}),
         })
 
     def _priority_seq_num(self):
